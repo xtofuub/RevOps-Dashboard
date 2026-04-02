@@ -12,7 +12,7 @@ Run:
 ## 2) Set up project stack
 
 - Framework: Next.js 14 (App Router)
-- UI: Shadcn + Magic UI
+- UI: Shadcn + 21st-dev/magic
 - Charts: Recharts (via Shadcn chart components)
 - Database: Supabase or PostgreSQL
 
