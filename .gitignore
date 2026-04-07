@@ -1,0 +1,8 @@
+# Build artifacts
+.next/
+
+# Editor/project-local settings
+.vscode/
+
+# Logs
+*.log
