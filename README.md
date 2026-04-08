@@ -1,64 +1,52 @@
-# RevOps Dashboard (Next.js)
+# RevOps Dashboard
 
-RevOps dashboard for weekly sales, product, and delivery tracking.
+Weekly RevOps dashboard built with Next.js.
 
-## Local run
+## Quick start
 
-From repository root:
+Run from repository root:
 
 ```bash
-cd app
 npm install
 npm run dev
 ```
 
 Open:
 
+- http://localhost:3000/
 - http://localhost:3000/dashboard
 
-## Main tabs
+## Build check
 
-- Overview: KPI cards + trend charts
+```bash
+npm run build
+```
+
+Run this before pushing changes.
+
+## What this app tracks
+
 - Revenue Engine
 - Product-Market Signals
 - Delivery Stability
-- Data Table
-- OKR Questions
-- Enter Weekly Data
+- Weekly data table and questions
 
-## Dynamic metrics (no backend code changes)
+## Data storage
 
-In Enter Weekly Data:
+Data is stored in browser localStorage:
 
-- Section D: Dynamic Metrics Wall (active metric inputs)
-- Section E: Metric Studio (create, customize, hide, restore, delete custom)
+- `revops_weekly_entries`
+- `revops_custom_fields`
+- `revops_hidden_metrics`
 
-Flow:
+## Deploy notes (Vercel)
 
-1. Enable optional example metrics or add a custom metric
-2. Select type (`number` or `text`) and optional suffix
-3. Save weekly values
-4. Customize label/type/suffix from the Customize tab
-5. Hide or restore metrics any time
-6. Delete custom metric when no longer needed
+- Framework must be Next.js.
+- Keep `vercel.json` in the repo.
+- Do not commit `.vercel` metadata files.
 
-The new metric appears automatically in:
+If production shows 404 for all routes, redeploy with cache cleared and confirm Next.js is detected.
 
-- Enter Data form
-- Overview KPI cards
-- Data Table (weekly)
-- Charts metric selector (`number` fields)
+## More docs
 
-## Storage model
-
-Data currently uses browser localStorage:
-
-- `revops_weekly_entries`: weekly entries
-- `revops_custom_fields`: dynamic field definitions
-- `revops_hidden_metrics`: hidden metric ids
-
-## Documentation
-
-Project-level maintenance notes and production-data ideas are in:
-
-- ../REVOPS_DOCUMENTATION.md
+See `REVOPS_DOCUMENTATION.md` for the full maintenance guide.
