@@ -2,7 +2,8 @@
 
 A dark-themed Revenue Operations dashboard for tracking weekly business metrics across Revenue, Product, and Delivery — with historical analytics, executive summaries, and critical signal detection.
 
-**Live Demo:** [rev-ops-dashboard.vercel.app/dashboard](https://rev-ops-dashboard.vercel.app/dashboard)
+**Live Demo:**  [Dashboard V1.0](https://app-iota-hazel-38.vercel.app),
+[Dashboard V2.0](https://rev-ops-dashboard.vercel.app/dashboard)
 
 ---
 
