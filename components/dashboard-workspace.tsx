@@ -238,7 +238,7 @@ export function DashboardWorkspace({
         onTabChange={setActiveTab}
         dashboard={dashboard}
       />
-      <SidebarInset className="min-h-svh overflow-hidden border border-border/60 bg-background/92 shadow-sm backdrop-blur-xl">
+      <SidebarInset className="min-h-svh overflow-hidden border border-border bg-background">
         <SiteHeader
           activeTab={activeTab}
           onTabChange={setActiveTab}
@@ -255,12 +255,9 @@ export function DashboardWorkspace({
           }}
           className="@container/main flex flex-1 flex-col gap-0"
         >
-          <div className="sticky top-0 z-20 border-b border-border/60 bg-background/85 px-4 py-4 backdrop-blur lg:px-6">
+          <div className="sticky top-0 z-20 border-b border-border bg-background px-4 py-4 lg:px-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex max-w-2xl flex-col gap-1">
-                <Badge variant="outline" className="w-fit">
-                  {activeTabMeta.label}
-                </Badge>
                 <h2 className="font-heading text-xl font-semibold tracking-tight">
                   {activeTabMeta.label}
                 </h2>
@@ -280,7 +277,7 @@ export function DashboardWorkspace({
               </div>
             </div>
             <div className="mt-4 overflow-x-auto">
-              <TabsList variant="line" className="gap-1 bg-transparent p-0">
+              <TabsList variant="line" className="gap-3 bg-transparent p-0">
                 {DASHBOARD_TABS.map((tab) => {
                   const Icon = tabIconMap[tab.id];
 
@@ -299,21 +296,15 @@ export function DashboardWorkspace({
             <TabsContent value="overview" className="flex flex-col gap-6">
               {hasData ? (
                 <>
-                  <Card className="border-border/60 bg-card/90 shadow-sm">
-                    <CardHeader className="gap-4">
+                  <Card className="border-border bg-card shadow-none">
+                    <CardHeader className="gap-3">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="flex flex-col gap-1">
                           <CardTitle>Operating signal</CardTitle>
                           <CardDescription>{summarySentence}</CardDescription>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Badge variant="outline">
-                            Week ending{" "}
-                            {formatWeekLabelWithYear(latestSnapshot!.weekOf)}
-                          </Badge>
-                          <Badge variant="outline">
-                            {dashboard.totalWeeks} weeks tracked
-                          </Badge>
+                        <div className="text-sm text-muted-foreground">
+                          Week ending {formatWeekLabelWithYear(latestSnapshot!.weekOf)}
                         </div>
                       </div>
                     </CardHeader>
@@ -396,9 +387,9 @@ function EmptyDashboardState({
   onOpenWeeklyUpdate: () => void;
 }) {
   return (
-    <Card className="border-border/60 bg-card/90 shadow-sm">
+    <Card className="border-border bg-card shadow-none">
       <CardContent className="p-6">
-        <Empty className="min-h-[22rem] border border-dashed border-border/70 bg-background/60">
+        <Empty className="min-h-[22rem] border border-dashed border-border bg-background">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <LayoutDashboardIcon />
@@ -469,26 +460,28 @@ function MetricCard({
         : ArrowDownRightIcon;
 
   return (
-    <Card className="border-border/60 bg-card/90 shadow-sm">
+    <Card className="border-border bg-card shadow-none">
       <CardHeader className="gap-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/60">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-muted">
               <Icon />
             </div>
             <div className="min-w-0">
               <CardDescription>{field.shortLabel}</CardDescription>
-              <CardTitle className="mt-1 text-2xl">
+              <CardTitle className="mt-1 text-xl">
                 {formatMetricByKey(metricKey, latestValue)}
               </CardTitle>
             </div>
           </div>
-          <Badge variant="outline">
-            {DeltaIcon ? <DeltaIcon data-icon="inline-start" /> : null}
-            {formatMetricDelta(metricKey, latestValue, previousValue)}
-          </Badge>
         </div>
-        <p className="text-sm text-muted-foreground">{field.description}</p>
+        <div className="flex flex-col gap-1">
+          <p className="text-sm text-muted-foreground">{field.description}</p>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            {DeltaIcon ? <DeltaIcon className="size-4" /> : null}
+            <span>{formatMetricDelta(metricKey, latestValue, previousValue)}</span>
+          </div>
+        </div>
       </CardHeader>
     </Card>
   );
@@ -578,7 +571,7 @@ function WeeklyUpdateSection({
       />
 
       <div className="flex flex-col gap-4">
-        <Card className="border-border/60 bg-card/90 shadow-sm">
+        <Card className="border-border bg-card shadow-none">
           <CardHeader className="gap-1.5">
             <CardTitle className="text-base">Update rules</CardTitle>
             <CardDescription>
@@ -612,7 +605,7 @@ function PipelineMomentumCard({
   compact?: boolean;
 }) {
   return (
-    <Card className="border-border/60 bg-card/90 shadow-sm">
+    <Card className="border-border bg-card shadow-none">
       <CardHeader className="gap-1.5">
         <CardTitle>Pipeline momentum</CardTitle>
         <CardDescription>
@@ -704,7 +697,7 @@ function RevenueConversionCard({
   timeline: DashboardData["timeline"];
 }) {
   return (
-    <Card className="border-border/60 bg-card/90 shadow-sm">
+    <Card className="border-border bg-card shadow-none">
       <CardHeader className="gap-1.5">
         <CardTitle>Funnel quality mix</CardTitle>
         <CardDescription>
@@ -773,7 +766,7 @@ function StageFlowCard({
   stageMetrics: DashboardData["latestStageMetrics"];
 }) {
   return (
-    <Card className="border-border/60 bg-card/90 shadow-sm">
+    <Card className="border-border bg-card shadow-none">
       <CardHeader className="gap-1.5">
         <CardTitle>Stage flow</CardTitle>
         <CardDescription>
@@ -818,7 +811,7 @@ function RetentionSignalCard({
   timeline: DashboardData["timeline"];
 }) {
   return (
-    <Card className="border-border/60 bg-card/90 shadow-sm">
+    <Card className="border-border bg-card shadow-none">
       <CardHeader className="gap-1.5">
         <CardTitle>Retention signal</CardTitle>
         <CardDescription>
@@ -906,7 +899,7 @@ function RankedSignalsCard({
             </TableBody>
           </Table>
         ) : (
-          <Empty className="min-h-[14rem] border border-dashed border-border/70 bg-background/60">
+          <Empty className="min-h-[14rem] border border-dashed border-border bg-background">
             <EmptyHeader>
               <EmptyMedia variant="icon">
                 <ListIcon />
@@ -930,7 +923,7 @@ function DeliveryVolumeCard({
   timeline: DashboardData["timeline"];
 }) {
   return (
-    <Card className="border-border/60 bg-card/90 shadow-sm">
+    <Card className="border-border bg-card shadow-none">
       <CardHeader className="gap-1.5">
         <CardTitle>Proposal throughput</CardTitle>
         <CardDescription>
@@ -979,7 +972,7 @@ function DeliveryReliabilityCard({
   timeline: DashboardData["timeline"];
 }) {
   return (
-    <Card className="border-border/60 bg-card/90 shadow-sm">
+    <Card className="border-border bg-card shadow-none">
       <CardHeader className="gap-1.5">
         <CardTitle>Reliability watch</CardTitle>
         <CardDescription>
@@ -1056,7 +1049,7 @@ function RecentSnapshotsCard({
     .slice(0, 6);
 
   return (
-    <Card className="border-border/60 bg-card/90 shadow-sm">
+    <Card className="border-border bg-card shadow-none">
       <CardHeader className="gap-1.5">
         <CardTitle className="text-base">Recent snapshots</CardTitle>
         <CardDescription>
@@ -1084,7 +1077,7 @@ function RecentSnapshotsCard({
             </TableBody>
           </Table>
         ) : (
-          <Empty className="min-h-[14rem] border border-dashed border-border/70 bg-background/60">
+          <Empty className="min-h-[14rem] border border-dashed border-border bg-background">
             <EmptyHeader>
               <EmptyMedia variant="icon">
                 <DatabaseIcon />

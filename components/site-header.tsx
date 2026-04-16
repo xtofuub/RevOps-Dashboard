@@ -40,7 +40,7 @@ export function SiteHeader({
     DASHBOARD_TABS.find((tab) => tab.id === activeTab) ?? DASHBOARD_TABS[0];
 
   return (
-    <header className="flex h-(--header-height) shrink-0 items-center border-b border-border/60 bg-background/80 backdrop-blur">
+    <header className="flex h-(--header-height) shrink-0 items-center border-b border-border bg-background">
       <div className="flex w-full items-center gap-3 px-4 lg:px-6">
         <SidebarTrigger className="-ml-1" />
         <Separator

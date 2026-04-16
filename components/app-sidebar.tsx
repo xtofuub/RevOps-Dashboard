@@ -64,7 +64,7 @@ export function AppSidebar({
               className="h-auto gap-3 px-3 py-3"
               tooltip="Open overview"
             >
-              <div className="flex size-9 items-center justify-center rounded-2xl bg-sidebar-primary text-sidebar-primary-foreground">
+              <div className="flex size-9 items-center justify-center rounded-md border border-sidebar-border bg-sidebar-primary text-sidebar-primary-foreground">
                 <CommandIcon />
               </div>
               <div className="flex min-w-0 flex-col gap-0.5">
@@ -114,7 +114,7 @@ export function AppSidebar({
                   {dashboard.healthAlerts.map((alert) => (
                     <div
                       key={alert.id}
-                      className="rounded-xl border border-sidebar-border/70 bg-sidebar-accent/60 p-3 text-xs leading-relaxed text-sidebar-foreground/80"
+                      className="rounded-md border border-sidebar-border bg-sidebar-accent p-3 text-xs leading-relaxed text-sidebar-foreground/80"
                     >
                       <div className="flex items-center gap-2 font-medium text-sidebar-foreground">
                         <TriangleAlertIcon />
@@ -131,7 +131,7 @@ export function AppSidebar({
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="flex flex-col gap-3 rounded-2xl border border-sidebar-border/70 bg-sidebar-accent/50 p-3">
+        <div className="flex flex-col gap-3 rounded-md border border-sidebar-border bg-sidebar-accent p-3">
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline">{dashboard.totalWeeks} weeks</Badge>
             {latestSnapshot ? (
