@@ -1,0 +1,322 @@
+[
+  {
+    "weekOf": "2026-03-01",
+    "updatedAt": "2026-02-23T08:30:00.000Z",
+    "newCustomersPerMonth": 7,
+    "pipelineValue": 248000,
+    "closeRatePct": 20,
+    "salesCycleDays": 40,
+    "pipelineCoverageRatio": 2.9,
+    "averageDealSize": 19200,
+    "customerAcquisitionCost": 4100,
+    "netRevenueRetentionPct": 103,
+    "grossRevenueRetentionPct": 90,
+    "pipelineVelocity": 20500,
+    "marketingSourcedPipelinePct": 35,
+    "leadToOpportunityConversionPct": 28,
+    "cacPaybackMonths": 13.9,
+    "feedRetentionPct": 93,
+    "proposalsSent": 19,
+    "ordersWon": 4,
+    "feedSlaQualityScore": 97.8,
+    "incidentCount": 4,
+    "lossReasonsTop3": [
+      "Budget timing",
+      "Integration gap",
+      "Low perceived urgency"
+    ],
+    "repeatedRequests": [
+      "Salesforce sync",
+      "Scheduled exports",
+      "Approval workflow",
+      "Audit trail"
+    ],
+    "stageMetrics": [
+      { "stage": "Lead", "conversionPct": 54, "avgDaysInStage": 7 },
+      { "stage": "Qualified", "conversionPct": 46, "avgDaysInStage": 10 },
+      { "stage": "Proposal", "conversionPct": 39, "avgDaysInStage": 9 },
+      { "stage": "Negotiation", "conversionPct": 31, "avgDaysInStage": 7 },
+      { "stage": "Closed Won", "conversionPct": 23, "avgDaysInStage": 3 }
+    ]
+  },
+  {
+    "weekOf": "2026-03-08",
+    "updatedAt": "2026-03-02T08:25:00.000Z",
+    "newCustomersPerMonth": 8,
+    "pipelineValue": 265000,
+    "closeRatePct": 21,
+    "salesCycleDays": 39,
+    "pipelineCoverageRatio": 3.1,
+    "averageDealSize": 19800,
+    "customerAcquisitionCost": 4025,
+    "netRevenueRetentionPct": 103.5,
+    "grossRevenueRetentionPct": 90,
+    "pipelineVelocity": 21800,
+    "marketingSourcedPipelinePct": 36,
+    "leadToOpportunityConversionPct": 29,
+    "cacPaybackMonths": 13.6,
+    "feedRetentionPct": 93.5,
+    "proposalsSent": 20,
+    "ordersWon": 5,
+    "feedSlaQualityScore": 98.1,
+    "incidentCount": 3,
+    "lossReasonsTop3": [
+      "Budget timing",
+      "Reporting depth",
+      "Procurement delay"
+    ],
+    "repeatedRequests": [
+      "Salesforce sync",
+      "Scheduled exports",
+      "Approval workflow",
+      "Executive dashboard PDF"
+    ],
+    "stageMetrics": [
+      { "stage": "Lead", "conversionPct": 55, "avgDaysInStage": 7 },
+      { "stage": "Qualified", "conversionPct": 46, "avgDaysInStage": 9.8 },
+      { "stage": "Proposal", "conversionPct": 39, "avgDaysInStage": 8.8 },
+      { "stage": "Negotiation", "conversionPct": 31, "avgDaysInStage": 6.8 },
+      { "stage": "Closed Won", "conversionPct": 23, "avgDaysInStage": 3 }
+    ]
+  },
+  {
+    "weekOf": "2026-03-15",
+    "updatedAt": "2026-03-09T08:20:00.000Z",
+    "newCustomersPerMonth": 7,
+    "pipelineValue": 259000,
+    "closeRatePct": 20,
+    "salesCycleDays": 40,
+    "pipelineCoverageRatio": 3,
+    "averageDealSize": 20100,
+    "customerAcquisitionCost": 4050,
+    "netRevenueRetentionPct": 104,
+    "grossRevenueRetentionPct": 91,
+    "pipelineVelocity": 21200,
+    "marketingSourcedPipelinePct": 37,
+    "leadToOpportunityConversionPct": 29,
+    "cacPaybackMonths": 13.7,
+    "feedRetentionPct": 93,
+    "proposalsSent": 18,
+    "ordersWon": 4,
+    "feedSlaQualityScore": 97.6,
+    "incidentCount": 4,
+    "lossReasonsTop3": [
+      "Integration gap",
+      "No role-based access",
+      "Budget timing"
+    ],
+    "repeatedRequests": [
+      "Role-based access",
+      "Salesforce sync",
+      "Scheduled exports",
+      "Audit trail"
+    ],
+    "stageMetrics": [
+      { "stage": "Lead", "conversionPct": 55, "avgDaysInStage": 6.7 },
+      { "stage": "Qualified", "conversionPct": 47, "avgDaysInStage": 9.7 },
+      { "stage": "Proposal", "conversionPct": 40, "avgDaysInStage": 8.6 },
+      { "stage": "Negotiation", "conversionPct": 32, "avgDaysInStage": 6.7 },
+      { "stage": "Closed Won", "conversionPct": 23.5, "avgDaysInStage": 2.8 }
+    ]
+  },
+  {
+    "weekOf": "2026-03-22",
+    "updatedAt": "2026-03-16T08:18:00.000Z",
+    "newCustomersPerMonth": 9,
+    "pipelineValue": 286000,
+    "closeRatePct": 22,
+    "salesCycleDays": 38,
+    "pipelineCoverageRatio": 3.2,
+    "averageDealSize": 20500,
+    "customerAcquisitionCost": 3950,
+    "netRevenueRetentionPct": 105,
+    "grossRevenueRetentionPct": 91.5,
+    "pipelineVelocity": 22900,
+    "marketingSourcedPipelinePct": 38,
+    "leadToOpportunityConversionPct": 30,
+    "cacPaybackMonths": 13.4,
+    "feedRetentionPct": 94,
+    "proposalsSent": 21,
+    "ordersWon": 5,
+    "feedSlaQualityScore": 98.4,
+    "incidentCount": 3,
+    "lossReasonsTop3": [
+      "Low perceived urgency",
+      "Reporting depth",
+      "Procurement delay"
+    ],
+    "repeatedRequests": [
+      "Approval workflow",
+      "Executive dashboard PDF",
+      "Role-based access",
+      "Alerts by account"
+    ],
+    "stageMetrics": [
+      { "stage": "Lead", "conversionPct": 56, "avgDaysInStage": 6.5 },
+      { "stage": "Qualified", "conversionPct": 48, "avgDaysInStage": 9.3 },
+      { "stage": "Proposal", "conversionPct": 41, "avgDaysInStage": 8.3 },
+      { "stage": "Negotiation", "conversionPct": 33, "avgDaysInStage": 6.4 },
+      { "stage": "Closed Won", "conversionPct": 24, "avgDaysInStage": 2.6 }
+    ]
+  },
+  {
+    "weekOf": "2026-03-29",
+    "updatedAt": "2026-03-23T08:14:00.000Z",
+    "newCustomersPerMonth": 10,
+    "pipelineValue": 301000,
+    "closeRatePct": 23,
+    "salesCycleDays": 37,
+    "pipelineCoverageRatio": 3.3,
+    "averageDealSize": 20800,
+    "customerAcquisitionCost": 3900,
+    "netRevenueRetentionPct": 106,
+    "grossRevenueRetentionPct": 92,
+    "pipelineVelocity": 24100,
+    "marketingSourcedPipelinePct": 39,
+    "leadToOpportunityConversionPct": 31,
+    "cacPaybackMonths": 13.1,
+    "feedRetentionPct": 94.5,
+    "proposalsSent": 22,
+    "ordersWon": 5,
+    "feedSlaQualityScore": 98.6,
+    "incidentCount": 2,
+    "lossReasonsTop3": [
+      "Procurement delay",
+      "Integration gap",
+      "No clear ROI case"
+    ],
+    "repeatedRequests": [
+      "Salesforce sync",
+      "Alerts by account",
+      "Audit trail",
+      "Multi-feed comparison"
+    ],
+    "stageMetrics": [
+      { "stage": "Lead", "conversionPct": 57, "avgDaysInStage": 6.2 },
+      { "stage": "Qualified", "conversionPct": 49, "avgDaysInStage": 8.9 },
+      { "stage": "Proposal", "conversionPct": 42, "avgDaysInStage": 8.1 },
+      { "stage": "Negotiation", "conversionPct": 33.5, "avgDaysInStage": 6.1 },
+      { "stage": "Closed Won", "conversionPct": 24, "avgDaysInStage": 2.5 }
+    ]
+  },
+  {
+    "weekOf": "2026-04-05",
+    "updatedAt": "2026-03-30T08:12:00.000Z",
+    "newCustomersPerMonth": 9,
+    "pipelineValue": 318000,
+    "closeRatePct": 24,
+    "salesCycleDays": 36,
+    "pipelineCoverageRatio": 3.4,
+    "averageDealSize": 21400,
+    "customerAcquisitionCost": 3840,
+    "netRevenueRetentionPct": 106.5,
+    "grossRevenueRetentionPct": 92,
+    "pipelineVelocity": 25600,
+    "marketingSourcedPipelinePct": 40,
+    "leadToOpportunityConversionPct": 31,
+    "cacPaybackMonths": 12.8,
+    "feedRetentionPct": 95,
+    "proposalsSent": 24,
+    "ordersWon": 6,
+    "feedSlaQualityScore": 98.8,
+    "incidentCount": 2,
+    "lossReasonsTop3": [
+      "Budget timing",
+      "No role-based access",
+      "No clear ROI case"
+    ],
+    "repeatedRequests": [
+      "Role-based access",
+      "Alerts by account",
+      "Executive dashboard PDF",
+      "Approval workflow"
+    ],
+    "stageMetrics": [
+      { "stage": "Lead", "conversionPct": 58, "avgDaysInStage": 6 },
+      { "stage": "Qualified", "conversionPct": 49.5, "avgDaysInStage": 8.7 },
+      { "stage": "Proposal", "conversionPct": 42.5, "avgDaysInStage": 7.9 },
+      { "stage": "Negotiation", "conversionPct": 34, "avgDaysInStage": 5.9 },
+      { "stage": "Closed Won", "conversionPct": 24.5, "avgDaysInStage": 2.3 }
+    ]
+  },
+  {
+    "weekOf": "2026-04-12",
+    "updatedAt": "2026-04-06T08:10:00.000Z",
+    "newCustomersPerMonth": 11,
+    "pipelineValue": 336000,
+    "closeRatePct": 24,
+    "salesCycleDays": 35,
+    "pipelineCoverageRatio": 3.5,
+    "averageDealSize": 21900,
+    "customerAcquisitionCost": 3780,
+    "netRevenueRetentionPct": 107,
+    "grossRevenueRetentionPct": 92.5,
+    "pipelineVelocity": 26800,
+    "marketingSourcedPipelinePct": 40,
+    "leadToOpportunityConversionPct": 32,
+    "cacPaybackMonths": 12.5,
+    "feedRetentionPct": 95.5,
+    "proposalsSent": 23,
+    "ordersWon": 6,
+    "feedSlaQualityScore": 99,
+    "incidentCount": 1,
+    "lossReasonsTop3": [
+      "Integration gap",
+      "Procurement delay",
+      "Low perceived urgency"
+    ],
+    "repeatedRequests": [
+      "Salesforce sync",
+      "Multi-feed comparison",
+      "Alerts by account",
+      "Audit trail"
+    ],
+    "stageMetrics": [
+      { "stage": "Lead", "conversionPct": 59, "avgDaysInStage": 5.8 },
+      { "stage": "Qualified", "conversionPct": 50, "avgDaysInStage": 8.4 },
+      { "stage": "Proposal", "conversionPct": 43, "avgDaysInStage": 7.7 },
+      { "stage": "Negotiation", "conversionPct": 34.5, "avgDaysInStage": 5.8 },
+      { "stage": "Closed Won", "conversionPct": 24.5, "avgDaysInStage": 2.2 }
+    ]
+  },
+  {
+    "weekOf": "2026-04-19",
+    "updatedAt": "2026-04-13T08:08:00.000Z",
+    "newCustomersPerMonth": 12,
+    "pipelineValue": 358000,
+    "closeRatePct": 25,
+    "salesCycleDays": 34,
+    "pipelineCoverageRatio": 3.7,
+    "averageDealSize": 22600,
+    "customerAcquisitionCost": 3720,
+    "netRevenueRetentionPct": 108,
+    "grossRevenueRetentionPct": 93,
+    "pipelineVelocity": 28100,
+    "marketingSourcedPipelinePct": 41,
+    "leadToOpportunityConversionPct": 33,
+    "cacPaybackMonths": 12.1,
+    "feedRetentionPct": 96,
+    "proposalsSent": 25,
+    "ordersWon": 6,
+    "feedSlaQualityScore": 98.7,
+    "incidentCount": 2,
+    "lossReasonsTop3": [
+      "No clear ROI case",
+      "Budget timing",
+      "Integration gap"
+    ],
+    "repeatedRequests": [
+      "Salesforce sync",
+      "Role-based access",
+      "Alerts by account",
+      "Executive dashboard PDF"
+    ],
+    "stageMetrics": [
+      { "stage": "Lead", "conversionPct": 60, "avgDaysInStage": 5.5 },
+      { "stage": "Qualified", "conversionPct": 51, "avgDaysInStage": 8 },
+      { "stage": "Proposal", "conversionPct": 44, "avgDaysInStage": 7.5 },
+      { "stage": "Negotiation", "conversionPct": 35, "avgDaysInStage": 5.6 },
+      { "stage": "Closed Won", "conversionPct": 25, "avgDaysInStage": 2.1 }
+    ]
+  }
+]
