@@ -157,7 +157,7 @@ export function WeeklyUpdateForm({
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isRefreshing, startTransition] = React.useTransition();
   const [templateSelection, setTemplateSelection] =
-    React.useState("next-recommended");
+    React.useState("this-week-friday");
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>(
     {},
   );
@@ -166,7 +166,7 @@ export function WeeklyUpdateForm({
   );
 
   React.useEffect(() => {
-    setTemplateSelection("next-recommended");
+    setTemplateSelection("this-week-friday");
     setFieldErrors({});
     setFormState(buildFormState(latestSnapshot, suggestedWeekOf));
   }, [latestSnapshot, suggestedWeekOf]);
@@ -208,7 +208,7 @@ export function WeeklyUpdateForm({
     setTemplateSelection(selection);
     setFieldErrors({});
 
-    if (selection === "next-recommended") {
+    if (selection === "this-week-friday") {
       setFormState(buildFormState(latestSnapshot, suggestedWeekOf));
       return;
     }
@@ -267,13 +267,14 @@ export function WeeklyUpdateForm({
           <div className="flex flex-col gap-1">
             <CardTitle>Weekly update</CardTitle>
             <CardDescription>
-              Push the full KPI snapshot for one week-ending reporting date.
+              Push the full KPI snapshot for one Friday week-ending reporting
+              date.
               Saving the same week again safely overwrites the existing record.
             </CardDescription>
           </div>
           <Badge variant="outline">
             <CalendarDaysIcon data-icon="inline-start" />
-            Week-based upsert
+            Friday-based upsert
           </Badge>
         </div>
         <Alert>
@@ -315,7 +316,7 @@ export function WeeklyUpdateForm({
                     }
                   />
                   <FieldDescription>
-                    Use the Sunday that ends the reporting week.
+                    Use the Friday that ends the reporting week.
                   </FieldDescription>
                   <FieldError>{fieldErrors.weekOf}</FieldError>
                 </FieldContent>
@@ -338,8 +339,8 @@ export function WeeklyUpdateForm({
                     <SelectContent>
                       <SelectGroup>
                         <SelectLabel>Starting point</SelectLabel>
-                        <SelectItem value="next-recommended">
-                          Recommended next week ending
+                        <SelectItem value="this-week-friday">
+                          This week&apos;s Friday
                         </SelectItem>
                         {[...snapshots]
                           .sort((left, right) =>
@@ -357,8 +358,8 @@ export function WeeklyUpdateForm({
                     </SelectContent>
                   </Select>
                   <FieldDescription>
-                    Load an existing week to edit it, or start from the latest
-                    saved snapshot.
+                    Load an existing Friday to edit it, or start from the
+                    latest saved snapshot using this week&apos;s Friday.
                   </FieldDescription>
                 </FieldContent>
               </Field>
@@ -368,7 +369,7 @@ export function WeeklyUpdateForm({
                   type="button"
                   variant="outline"
                   className="w-full lg:w-auto"
-                  onClick={() => loadTemplate("next-recommended")}
+                  onClick={() => loadTemplate("this-week-friday")}
                 >
                   <RefreshCwIcon data-icon="inline-start" />
                   Use latest template

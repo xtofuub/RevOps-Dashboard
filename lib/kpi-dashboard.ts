@@ -61,7 +61,7 @@ function isCanonicalIsoDate(value: string) {
 }
 
 function isWeekEndingDate(value: string) {
-  return parseIsoUtcDate(value).getUTCDay() === 0;
+  return parseIsoUtcDate(value).getUTCDay() === 5;
 }
 
 const stageMetricSchema = z.object({
@@ -86,7 +86,7 @@ export const weeklySnapshotPayloadSchema = z
         message: "Enter a valid week ending date.",
       })
       .refine(isWeekEndingDate, {
-        message: "Week ending date must be a Sunday.",
+        message: "Week ending date must be a Friday.",
       }),
     newCustomersPerMonth: z.number().min(0).max(100000),
     pipelineValue: z.number().min(0).max(1_000_000_000),
@@ -99,6 +99,7 @@ export const weeklySnapshotPayloadSchema = z
     grossRevenueRetentionPct: z.number().min(0).max(100),
     pipelineVelocity: z.number().min(0).max(1_000_000_000),
     marketingSourcedPipelinePct: z.number().min(0).max(100),
+    marketingSourcedPipelineCount: z.number().min(0).max(100000),
     leadToOpportunityConversionPct: z.number().min(0).max(100),
     cacPaybackMonths: z.number().min(0).max(120),
     feedRetentionPct: z.number().min(0).max(100),
@@ -247,6 +248,18 @@ const revenueEngineFields: readonly MetricFieldDefinition[] = [
     min: 0,
     max: 100,
     step: 0.1,
+    betterDirection: "up",
+  },
+  {
+    key: "marketingSourcedPipelineCount",
+    label: "Marketing-sourced pipeline (count)",
+    shortLabel: "Marketing-sourced #",
+    description:
+      "Number of marketing-originated pipeline items created during the week.",
+    format: "count",
+    min: 0,
+    max: 100000,
+    step: 1,
     betterDirection: "up",
   },
   {
@@ -510,29 +523,34 @@ export function sortSnapshots<T extends { weekOf: string }>(snapshots: T[]) {
   );
 }
 
-export function getSuggestedWeekOf(latestWeekOf?: string | null) {
-  if (latestWeekOf) {
-    const nextWeek = parseWeekOf(latestWeekOf);
-    nextWeek.setUTCDate(nextWeek.getUTCDate() + 7);
-    return formatWeekOf(nextWeek);
-  }
-
-  const currentDate = new Date();
+export function getCurrentWeekEndingFriday(referenceDate = new Date()) {
   const weekEnding = new Date(
     Date.UTC(
-      currentDate.getUTCFullYear(),
-      currentDate.getUTCMonth(),
-      currentDate.getUTCDate(),
+      referenceDate.getUTCFullYear(),
+      referenceDate.getUTCMonth(),
+      referenceDate.getUTCDate(),
     ),
   );
-  const offsetToSunday = (7 - weekEnding.getUTCDay()) % 7;
-  weekEnding.setUTCDate(weekEnding.getUTCDate() + offsetToSunday);
+  const isoDay = weekEnding.getUTCDay() === 0 ? 7 : weekEnding.getUTCDay();
+  const offsetToFriday = 5 - isoDay;
+  weekEnding.setUTCDate(weekEnding.getUTCDate() + offsetToFriday);
+
+  return weekEnding;
+}
+
+export function getSuggestedWeekOf(_latestWeekOf?: string | null) {
+  void _latestWeekOf;
+  const weekEnding = getCurrentWeekEndingFriday();
 
   return formatWeekOf(weekEnding);
 }
 
 export function normalizeTextEntry(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export function getLossRatePct(closeRatePct: number) {
+  return Math.max(0, Math.min(100, 100 - closeRatePct));
 }
 
 function compactCurrency(value: number) {

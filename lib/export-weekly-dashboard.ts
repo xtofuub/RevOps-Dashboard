@@ -324,14 +324,14 @@ function addMetricsSheet(
     })),
   ];
 
+  sheet.columns = columns.map(({ key, width }) => ({ key, width }));
+
   applyTitleBlock(
     sheet,
     "Weekly Metrics",
     "Full weekly export with all numeric KPI fields",
-    "T",
+    sheet.getColumn(columns.length).letter,
   );
-
-  sheet.columns = columns.map(({ key, width }) => ({ key, width }));
 
   const headerRow = sheet.getRow(4);
   headerRow.values = columns.map((column) => column.header);
