@@ -225,14 +225,15 @@ const revenueEngineFields: readonly MetricFieldDefinition[] = [
     format: "currency",
     min: 0,
     max: 1_000_000,
-    step: 50,
+    step: 5,
     betterDirection: "down",
   },
   {
     key: "pipelineVelocity",
     label: "Pipeline velocity",
     shortLabel: "Pipeline velocity",
-    description: "Weekly value moving through the pipeline toward close.",
+    description:
+      "Auto-estimated throughput based on saved pipeline history, close rate, and sales cycle.",
     format: "currency",
     min: 0,
     max: 1_000_000_000,
@@ -429,6 +430,11 @@ export type DashboardData = {
   healthAlerts: DashboardHealthAlert[];
 };
 
+type PipelineVelocityInput = Pick<
+  WeeklySnapshotPayload,
+  "pipelineValue" | "salesCycleDays" | "closeRatePct"
+>;
+
 const shortNumberFormatter = new Intl.NumberFormat("en-US", {
   notation: "compact",
   maximumFractionDigits: 1,
@@ -474,6 +480,194 @@ const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
   minute: "2-digit",
   timeZone: "UTC",
 });
+
+const pipelineVelocityFallbackScale = 3;
+const pipelineVelocityRegressionFeatureCount = 4;
+const pipelineVelocityHistoryWindow = 12;
+
+function multiplyMatrices(left: number[][], right: number[][]) {
+  return left.map((leftRow) =>
+    right[0]!.map((_, columnIndex) =>
+      leftRow.reduce(
+        (sum, value, rowIndex) => sum + value * (right[rowIndex]?.[columnIndex] ?? 0),
+        0,
+      ),
+    ),
+  );
+}
+
+function transposeMatrix(matrix: number[][]) {
+  return matrix[0]!.map((_, columnIndex) => matrix.map((row) => row[columnIndex] ?? 0));
+}
+
+function invertMatrix(matrix: number[][]) {
+  const size = matrix.length;
+  const working = matrix.map((row, rowIndex) => [
+    ...row,
+    ...Array.from({ length: size }, (_, columnIndex) =>
+      rowIndex === columnIndex ? 1 : 0,
+    ),
+  ]);
+
+  for (let pivotIndex = 0; pivotIndex < size; pivotIndex += 1) {
+    let pivotRow = pivotIndex;
+
+    for (let rowIndex = pivotIndex + 1; rowIndex < size; rowIndex += 1) {
+      if (
+        Math.abs(working[rowIndex]?.[pivotIndex] ?? 0) >
+        Math.abs(working[pivotRow]?.[pivotIndex] ?? 0)
+      ) {
+        pivotRow = rowIndex;
+      }
+    }
+
+    if (Math.abs(working[pivotRow]?.[pivotIndex] ?? 0) < 1e-9) {
+      return null;
+    }
+
+    if (pivotRow !== pivotIndex) {
+      [working[pivotIndex], working[pivotRow]] = [
+        working[pivotRow]!,
+        working[pivotIndex]!,
+      ];
+    }
+
+    const divisor = working[pivotIndex]![pivotIndex]!;
+
+    for (let columnIndex = 0; columnIndex < size * 2; columnIndex += 1) {
+      working[pivotIndex]![columnIndex]! /= divisor;
+    }
+
+    for (let rowIndex = 0; rowIndex < size; rowIndex += 1) {
+      if (rowIndex === pivotIndex) {
+        continue;
+      }
+
+      const multiplier = working[rowIndex]![pivotIndex]!;
+
+      for (let columnIndex = 0; columnIndex < size * 2; columnIndex += 1) {
+        working[rowIndex]![columnIndex]! -=
+          multiplier * working[pivotIndex]![columnIndex]!;
+      }
+    }
+  }
+
+  return working.map((row) => row.slice(size));
+}
+
+function roundPipelineVelocity(value: number) {
+  return Math.max(0, Math.round(value / 10) * 10);
+}
+
+function getPipelineVelocityBaseValue(input: PipelineVelocityInput) {
+  if (!Number.isFinite(input.pipelineValue) || !Number.isFinite(input.salesCycleDays)) {
+    return 0;
+  }
+
+  if (input.pipelineValue <= 0 || input.salesCycleDays <= 0) {
+    return 0;
+  }
+
+  return input.pipelineValue / input.salesCycleDays;
+}
+
+function isValidPipelineVelocitySample(
+  snapshot: WeeklySnapshot,
+): snapshot is WeeklySnapshot {
+  return (
+    Number.isFinite(snapshot.pipelineValue) &&
+    snapshot.pipelineValue > 0 &&
+    Number.isFinite(snapshot.salesCycleDays) &&
+    snapshot.salesCycleDays > 0 &&
+    Number.isFinite(snapshot.closeRatePct) &&
+    Number.isFinite(snapshot.pipelineVelocity) &&
+    snapshot.pipelineVelocity >= 0
+  );
+}
+
+function buildPipelineVelocityRegression(history: WeeklySnapshot[]) {
+  const samples = sortSnapshots(history)
+    .filter(isValidPipelineVelocitySample)
+    .slice(-pipelineVelocityHistoryWindow);
+
+  if (samples.length < pipelineVelocityRegressionFeatureCount) {
+    return null;
+  }
+
+  const designMatrix = samples.map((snapshot) => [
+    1,
+    snapshot.pipelineValue,
+    snapshot.salesCycleDays,
+    snapshot.closeRatePct,
+  ]);
+  const targetMatrix = samples.map((snapshot) => [snapshot.pipelineVelocity]);
+  const transposed = transposeMatrix(designMatrix);
+  const normalMatrix = multiplyMatrices(transposed, designMatrix);
+  const inverse = invertMatrix(normalMatrix);
+
+  if (!inverse) {
+    return null;
+  }
+
+  const solution = multiplyMatrices(
+    inverse,
+    multiplyMatrices(transposed, targetMatrix),
+  );
+
+  return solution.map((row) => row[0] ?? 0);
+}
+
+function getMedian(values: number[]) {
+  if (!values.length) {
+    return pipelineVelocityFallbackScale;
+  }
+
+  const sortedValues = [...values].sort((left, right) => left - right);
+  const midpoint = Math.floor(sortedValues.length / 2);
+
+  if (sortedValues.length % 2 === 0) {
+    return (sortedValues[midpoint - 1]! + sortedValues[midpoint]!) / 2;
+  }
+
+  return sortedValues[midpoint]!;
+}
+
+export function calculatePipelineVelocity(
+  input: PipelineVelocityInput,
+  history: WeeklySnapshot[] = [],
+) {
+  if (!Number.isFinite(input.closeRatePct)) {
+    return 0;
+  }
+
+  const baseValue = getPipelineVelocityBaseValue(input);
+
+  if (baseValue <= 0) {
+    return 0;
+  }
+
+  const regression = buildPipelineVelocityRegression(history);
+
+  if (regression) {
+    const estimatedValue =
+      regression[0]! +
+      regression[1]! * input.pipelineValue +
+      regression[2]! * input.salesCycleDays +
+      regression[3]! * input.closeRatePct;
+
+    return roundPipelineVelocity(estimatedValue);
+  }
+
+  const fallbackScale = getMedian(
+    sortSnapshots(history)
+      .filter(isValidPipelineVelocitySample)
+      .slice(-pipelineVelocityHistoryWindow)
+      .map((snapshot) => snapshot.pipelineVelocity / getPipelineVelocityBaseValue(snapshot))
+      .filter((value) => Number.isFinite(value) && value > 0),
+  );
+
+  return roundPipelineVelocity(baseValue * fallbackScale);
+}
 
 export function createEmptyStageMetrics(): StageMetric[] {
   return DEFAULT_STAGE_ORDER.map((stage) => ({

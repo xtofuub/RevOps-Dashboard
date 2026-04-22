@@ -147,7 +147,21 @@ function ChartTooltipContent({
   >) {
   const { config } = useChart()
   const processedPayload = React.useMemo(() => {
-    const items = (payload ?? []).filter((item) => item.type !== "none")
+    const items = (payload ?? []).filter((item) => {
+      if (item.type === "none") {
+        return false
+      }
+
+      if (typeof item.dataKey === "string" && item.dataKey.endsWith("ForesightArea")) {
+        return false
+      }
+
+      if (item.value == null) {
+        return false
+      }
+
+      return typeof item.value !== "number" || Number.isFinite(item.value)
+    })
 
     if (typeof itemSorter !== "function") {
       return items

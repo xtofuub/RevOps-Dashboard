@@ -3,10 +3,10 @@
 import * as React from "react";
 import {
   Area,
-  Bar,
   CartesianGrid,
   ComposedChart,
   Line,
+  ReferenceArea,
   ReferenceLine,
   XAxis,
   YAxis,
@@ -80,6 +80,7 @@ import {
   formatMetricByKey,
   formatMetricValue,
   formatWeekLabelWithYear,
+  NUMERIC_FIELD_DEFINITIONS,
   metricFieldMap,
   parseWeekOf,
   type RankedTextItem,
@@ -89,11 +90,34 @@ import {
   type NumericMetricKey,
   type WeeklySnapshot,
 } from "@/lib/kpi-dashboard";
+import {
+  FORECAST_METRIC_KEYS,
+  buildDashboardForecast,
+  buildForecastProjectionPoints,
+  type DashboardForecast,
+  type ForecastProjectionPoint,
+} from "@/lib/dashboard-forecast";
 import { cn } from "@/lib/utils";
 
 type DashboardWorkspaceProps = {
   snapshots: WeeklySnapshot[];
   dashboard: DashboardData;
+  forecast: DashboardForecast | null;
+};
+
+type ForesightDataKey = `${NumericMetricKey}Foresight`;
+type PredictionMode = "off" | "7d" | "30d";
+
+type ForesightChartPoint = DashboardData["timeline"][number] &
+  Partial<Record<ForesightDataKey, number>> & {
+    isForesight?: boolean;
+    predictionDaysAhead?: number;
+    rangePosition?: number;
+  };
+
+type DeliveryVolumeChartPoint = ForesightChartPoint & {
+  proposalWinRatePct?: number;
+  proposalWinRatePctForesight?: number;
 };
 
 const tabIconMap: Record<DashboardTab, React.ComponentType> = {
@@ -387,7 +411,7 @@ function createChartStatItem(
   };
 }
 
-function getAdaptiveTickGap(timeline: DashboardData["timeline"]) {
+function getAdaptiveTickGap(timeline: ReadonlyArray<unknown>) {
   if (timeline.length <= 2) {
     return 6;
   }
@@ -399,11 +423,11 @@ function getAdaptiveTickGap(timeline: DashboardData["timeline"]) {
   return 24;
 }
 
-function isShortRangeTimeline(timeline: DashboardData["timeline"]) {
+function isShortRangeTimeline(timeline: ReadonlyArray<unknown>) {
   return timeline.length <= 2;
 }
 
-function getAdaptiveXAxisPadding(timeline: DashboardData["timeline"]) {
+function getAdaptiveXAxisPadding(timeline: ReadonlyArray<unknown>) {
   if (timeline.length <= 2) {
     return { left: 0, right: 0 };
   }
@@ -415,14 +439,11 @@ function getAdaptiveXAxisPadding(timeline: DashboardData["timeline"]) {
   return { left: 8, right: 8 };
 }
 
-function getAdaptiveCurveType(timeline: DashboardData["timeline"]) {
+function getAdaptiveCurveType(timeline: ReadonlyArray<unknown>) {
   return timeline.length <= 2 ? "linear" : "monotone";
 }
 
-function getAdaptiveLineStrokeWidth(
-  timeline: DashboardData["timeline"],
-  defaultWidth: number,
-) {
+function getAdaptiveLineStrokeWidth(timeline: ReadonlyArray<unknown>, defaultWidth: number) {
   if (timeline.length <= 2) {
     return defaultWidth + 0.45;
   }
@@ -434,35 +455,8 @@ function getAdaptiveLineStrokeWidth(
   return defaultWidth;
 }
 
-function getAdaptiveBarSize(
-  timeline: DashboardData["timeline"],
-  defaultSize: number,
-) {
-  if (timeline.length <= 2) {
-    return defaultSize + 20;
-  }
-
-  if (timeline.length <= 4) {
-    return defaultSize + 8;
-  }
-
-  return defaultSize;
-}
-
-function getAdaptiveMinPointSize(timeline: DashboardData["timeline"]) {
-  if (timeline.length <= 2) {
-    return 10;
-  }
-
-  if (timeline.length <= 4) {
-    return 8;
-  }
-
-  return 6;
-}
-
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-function getAdaptiveBarCategoryGap(timeline: DashboardData["timeline"]) {
+function getAdaptiveBarCategoryGap(timeline: ReadonlyArray<unknown>) {
   if (timeline.length <= 2) {
     return "6%";
   }
@@ -474,7 +468,7 @@ function getAdaptiveBarCategoryGap(timeline: DashboardData["timeline"]) {
   return "32%";
 }
 
-function getAdaptiveLineDot(color: string, timeline: DashboardData["timeline"]) {
+function getAdaptiveLineDot(color: string, timeline: ReadonlyArray<unknown>) {
   if (timeline.length > 4) {
     return false;
   }
@@ -487,54 +481,6 @@ function getAdaptiveLineDot(color: string, timeline: DashboardData["timeline"]) 
   };
 }
 
-function renderBarValueLabel(
-  props: unknown,
-  formatter: (value: number) => string,
-  color: string,
-  offset = 10,
-) {
-  const point = props as {
-    x?: number | string;
-    y?: number | string;
-    width?: number | string;
-    value?: number | string | null;
-  };
-
-  if (point.value == null) {
-    return null;
-  }
-
-  const x =
-    typeof point.x === "number" ? point.x : point.x != null ? Number(point.x) : NaN;
-  const y =
-    typeof point.y === "number" ? point.y : point.y != null ? Number(point.y) : NaN;
-  const width =
-    typeof point.width === "number"
-      ? point.width
-      : point.width != null
-        ? Number(point.width)
-        : NaN;
-  const numericValue =
-    typeof point.value === "number" ? point.value : Number(point.value);
-
-  if ([x, y, width, numericValue].some((value) => Number.isNaN(value))) {
-    return null;
-  }
-
-  return (
-    <text
-      x={x + width / 2}
-      y={y - offset}
-      textAnchor="middle"
-      fill={color}
-      fontSize={11}
-      fontWeight={600}
-    >
-      {formatter(numericValue)}
-    </text>
-  );
-}
-
 function getSeriesAnimationProps(index: number) {
   return {
     isAnimationActive: true,
@@ -544,13 +490,117 @@ function getSeriesAnimationProps(index: number) {
   };
 }
 
-function getTimelineAnimationKey(
-  timeline: DashboardData["timeline"],
-  suffix?: string,
-) {
+function getTimelineAnimationKey(timeline: Array<{ weekOf: string }>, suffix?: string) {
   const first = timeline[0]?.weekOf ?? "empty";
   const last = timeline.at(-1)?.weekOf ?? "empty";
   return [suffix, timeline.length, first, last].filter(Boolean).join(":");
+}
+
+function getForesightDataKey(metricKey: NumericMetricKey) {
+  return `${metricKey}Foresight` as ForesightDataKey;
+}
+
+function getPredictionAreaDataKey(seriesKey: string) {
+  return `${seriesKey}ForesightArea`;
+}
+
+function getPredictionHorizons(predictionMode: PredictionMode) {
+  if (predictionMode === "7d") {
+    return [7] as const;
+  }
+
+  if (predictionMode === "30d") {
+    return [7, 14, 21, 28] as const;
+  }
+
+  return [] as const;
+}
+
+function normalizePredictionMetricKey(value: string) {
+  return value.endsWith("Foresight")
+    ? (value.slice(0, -9) as NumericMetricKey)
+    : (value as NumericMetricKey);
+}
+
+function normalizePredictionSeriesKey(value: string) {
+  return value.endsWith("Foresight") ? value.slice(0, -9) : value;
+}
+
+function formatPredictionTooltipLabel(
+  label: string | number | undefined,
+  payload?: ReadonlyArray<{
+    payload?: { isForesight?: boolean; predictionDaysAhead?: number };
+  }>,
+) {
+  const point = payload?.[0]?.payload;
+  const predictionDaysAhead = point?.predictionDaysAhead;
+
+  if (point?.isForesight && predictionDaysAhead) {
+    return `Prediction +${predictionDaysAhead}d - ${label}`;
+  }
+
+  return `Week ending ${label}`;
+}
+
+function buildPredictionChartTimeline(
+  timeline: DashboardData["timeline"],
+  metricKeys: readonly NumericMetricKey[],
+  predictionMode: PredictionMode,
+) {
+  const horizons = getPredictionHorizons(predictionMode);
+
+  if (!timeline.length || !metricKeys.length || !horizons.length) {
+    return timeline as ForesightChartPoint[];
+  }
+
+  const projections = buildForecastProjectionPoints(timeline, metricKeys, horizons);
+
+  if (!projections.length) {
+    return timeline as ForesightChartPoint[];
+  }
+
+  const lastActualIndex = timeline.length - 1;
+  const blankNumericValues = Object.fromEntries(
+    NUMERIC_FIELD_DEFINITIONS.map((field) => [field.key, undefined]),
+  ) as Partial<Record<NumericMetricKey, number>>;
+  const baseTimeline = timeline.map((point, index) => {
+    if (index !== lastActualIndex) {
+      return point as ForesightChartPoint;
+    }
+
+    return {
+      ...point,
+      ...Object.fromEntries(
+        metricKeys.flatMap((metricKey) => [
+          [getForesightDataKey(metricKey), point[metricKey]],
+          [getPredictionAreaDataKey(metricKey), point[metricKey]],
+        ]),
+      ),
+    } as ForesightChartPoint;
+  });
+  const latestPoint = baseTimeline.at(-1);
+
+  if (!latestPoint) {
+    return baseTimeline;
+  }
+
+  const futurePoints = projections.map((projection, index) => ({
+    ...latestPoint,
+    ...blankNumericValues,
+    ...Object.fromEntries(
+      metricKeys.flatMap((metricKey) => [
+        [getForesightDataKey(metricKey), projection.values[metricKey]],
+        [getPredictionAreaDataKey(metricKey), projection.values[metricKey]],
+      ]),
+    ),
+    weekOf: projection.weekOf,
+    label: projection.label,
+    isForesight: true,
+    predictionDaysAhead: projection.daysAhead,
+    rangePosition: 1 + (index + 1) / projections.length,
+  })) as ForesightChartPoint[];
+
+  return [...baseTimeline, ...futurePoints];
 }
 
 function getMetricUpperBound(
@@ -579,13 +629,109 @@ function getMetricUpperBound(
   );
 }
 
+function calculateProposalWinRate(proposalsSent: number, ordersWon: number) {
+  return proposalsSent > 0 ? (ordersWon / proposalsSent) * 100 : 0;
+}
+
+function buildDeliveryVolumeChartTimeline(
+  timeline: DashboardData["timeline"],
+  predictionMode: PredictionMode,
+) {
+  const baseTimeline = timeline.map((point, index) => ({
+    ...point,
+    rangePosition: timeline.length > 1 ? index / (timeline.length - 1) : 0,
+    proposalWinRatePct: calculateProposalWinRate(
+      point.proposalsSent,
+      point.ordersWon,
+    ),
+  })) as DeliveryVolumeChartPoint[];
+
+  const horizons = getPredictionHorizons(predictionMode);
+
+  if (!baseTimeline.length || !horizons.length) {
+    return baseTimeline;
+  }
+
+  const projections = buildForecastProjectionPoints(
+    timeline,
+    ["proposalsSent", "ordersWon"],
+    horizons,
+  );
+
+  if (!projections.length) {
+    return baseTimeline;
+  }
+
+  const lastActualIndex = baseTimeline.length - 1;
+  const latestPoint = baseTimeline.at(-1);
+
+  if (!latestPoint) {
+    return baseTimeline;
+  }
+
+  const blankNumericValues = Object.fromEntries(
+    NUMERIC_FIELD_DEFINITIONS.map((field) => [field.key, undefined]),
+  ) as Partial<Record<NumericMetricKey, number>>;
+
+  const actualTimeline = baseTimeline.map((point, index) => {
+    if (index !== lastActualIndex) {
+      return point;
+    }
+
+    return {
+      ...point,
+      proposalsSentForesight: point.proposalsSent,
+      [getPredictionAreaDataKey("proposalsSent")]: point.proposalsSent,
+      ordersWonForesight: point.ordersWon,
+      proposalWinRatePctForesight: point.proposalWinRatePct,
+      [getPredictionAreaDataKey("proposalWinRatePct")]: point.proposalWinRatePct,
+    } as DeliveryVolumeChartPoint;
+  });
+
+  const futurePoints = projections.map((projection, index) => {
+    const proposalsSent = Number(
+      projection.values.proposalsSent ?? latestPoint.proposalsSent ?? 0,
+    );
+    const ordersWon = Number(
+      projection.values.ordersWon ?? latestPoint.ordersWon ?? 0,
+    );
+
+    return {
+      ...latestPoint,
+      ...blankNumericValues,
+      weekOf: projection.weekOf,
+      label: projection.label,
+      isForesight: true,
+      predictionDaysAhead: projection.daysAhead,
+      rangePosition: 1 + (index + 1) / projections.length,
+      proposalWinRatePct: undefined,
+      proposalsSentForesight: proposalsSent,
+      [getPredictionAreaDataKey("proposalsSent")]: proposalsSent,
+      ordersWonForesight: ordersWon,
+      proposalWinRatePctForesight: calculateProposalWinRate(
+        proposalsSent,
+        ordersWon,
+      ),
+      [getPredictionAreaDataKey("proposalWinRatePct")]: calculateProposalWinRate(
+        proposalsSent,
+        ordersWon,
+      ),
+    } as DeliveryVolumeChartPoint;
+  });
+
+  return [...actualTimeline, ...futurePoints];
+}
+
 export function DashboardWorkspace({
   snapshots,
   dashboard,
+  forecast,
 }: DashboardWorkspaceProps) {
   const [activeTab, setActiveTab] = React.useState<DashboardTab>("overview");
   const [trendWindowMode, setTrendWindowMode] =
     React.useState<TrendWindowMode>("weeks");
+  const [predictionMode, setPredictionMode] =
+    React.useState<PredictionMode>("off");
   const [selectedWeekFrom, setSelectedWeekFrom] = React.useState<string | null>(
     null,
   );
@@ -741,6 +887,32 @@ export function DashboardWorkspace({
   const visibleLatestSnapshot = filteredTimeline.at(-1) ?? latestSnapshot ?? null;
   const rangeStartSnapshot =
     filteredTimeline.length > 1 ? filteredTimeline[0] ?? null : null;
+  const visibleForecast = React.useMemo(
+    () => buildDashboardForecast(filteredTimeline),
+    [filteredTimeline],
+  );
+  const activeForecast = visibleForecast ?? forecast;
+  const predictionProjectionPoints = React.useMemo(() => {
+    if (predictionMode === "off") {
+      return [] as ForecastProjectionPoint[];
+    }
+
+    const sourceTimeline = filteredTimeline.length
+      ? filteredTimeline
+      : dashboard.timeline;
+
+    return buildForecastProjectionPoints(
+      sourceTimeline,
+      FORECAST_METRIC_KEYS,
+      getPredictionHorizons(predictionMode),
+    );
+  }, [dashboard.timeline, filteredTimeline, predictionMode]);
+  const predictionSummary =
+    predictionMode === "7d"
+      ? "Charts extend 7 days beyond the latest saved week."
+      : predictionMode === "30d"
+        ? "Charts extend through the next 4 forecast weeks."
+        : null;
 
   const summarySentence = latestSnapshot
     ? `Week ending ${formatWeekLabelWithYear(
@@ -827,184 +999,245 @@ export function DashboardWorkspace({
             {hasData && activeTab !== "weekly-update" ? (
               <div className="mt-3 border-t border-border pt-3">
                 <div className="flex flex-col gap-3">
-                  <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-                    <div className="flex max-w-xl flex-col gap-1">
-                      <div className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                        Trend range
+                  <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
+                    <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+                      <div className="flex max-w-xl flex-col gap-1">
+                        <div className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                          Trend range
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Applies to the charts and ranked signal tables in this
+                          workspace.
+                        </p>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        Applies to the charts and ranked signal tables in this
-                        workspace.
-                      </p>
+
+                      <div className="flex flex-wrap items-end gap-3 xl:justify-end">
+                        <div className="flex min-w-[19rem] flex-1 flex-col gap-1.5 sm:flex-none">
+                          <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                            Window
+                          </span>
+                          <ToggleGroup
+                            multiple={false}
+                            value={[trendWindowMode]}
+                            onValueChange={(values) => {
+                              const nextValue = values[0];
+
+                              if (
+                                nextValue === "7d" ||
+                                nextValue === "30d" ||
+                                nextValue === "weeks"
+                              ) {
+                                setTrendWindowMode(nextValue);
+                              }
+                            }}
+                            variant="outline"
+                            size="default"
+                            className="w-full flex-wrap rounded-xl"
+                          >
+                            <ToggleGroupItem
+                              value="7d"
+                              className="min-w-[7.5rem] flex-1 justify-center px-4 sm:flex-none sm:min-w-[8.25rem]"
+                            >
+                              Last 7 days
+                            </ToggleGroupItem>
+                            <ToggleGroupItem
+                              value="30d"
+                              className="min-w-[7.5rem] flex-1 justify-center px-4 sm:flex-none sm:min-w-[8.25rem]"
+                            >
+                              Last 30 days
+                            </ToggleGroupItem>
+                            <ToggleGroupItem
+                              value="weeks"
+                              className="min-w-[7.5rem] flex-1 justify-center px-4 sm:flex-none sm:min-w-[8.25rem]"
+                            >
+                              Week range
+                            </ToggleGroupItem>
+                          </ToggleGroup>
+                        </div>
+
+                        {activeForecast ? (
+                          <div className="flex min-w-[19rem] flex-1 flex-col gap-1.5 sm:flex-none">
+                            <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                              Prediction
+                            </span>
+                            <ToggleGroup
+                              multiple={false}
+                              value={[predictionMode]}
+                              onValueChange={(values) => {
+                                const nextValue = values[0];
+
+                                if (
+                                  nextValue === "off" ||
+                                  nextValue === "7d" ||
+                                  nextValue === "30d"
+                                ) {
+                                  setPredictionMode(nextValue);
+                                }
+                              }}
+                              variant="outline"
+                              size="default"
+                              className="w-full flex-wrap rounded-xl"
+                            >
+                              <ToggleGroupItem
+                                value="off"
+                                className="min-w-[7.5rem] flex-1 justify-center px-4 sm:flex-none sm:min-w-[8.25rem]"
+                              >
+                                No prediction
+                              </ToggleGroupItem>
+                              <ToggleGroupItem
+                                value="7d"
+                                className="min-w-[7.5rem] flex-1 justify-center px-4 sm:flex-none sm:min-w-[8.25rem]"
+                              >
+                                Predict 7 days
+                              </ToggleGroupItem>
+                              <ToggleGroupItem
+                                value="30d"
+                                className="min-w-[7.5rem] flex-1 justify-center px-4 sm:flex-none sm:min-w-[8.25rem]"
+                              >
+                                Predict 30 days
+                              </ToggleGroupItem>
+                            </ToggleGroup>
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
 
-                    <ToggleGroup
-                      multiple={false}
-                      value={[trendWindowMode]}
-                      onValueChange={(values) => {
-                        const nextValue = values[0];
+                    {trendWindowMode === "weeks" ? (
+                      <div className="mt-3 grid gap-3 rounded-lg border border-border/70 bg-background/70 p-3 lg:grid-cols-[minmax(0,1fr)_minmax(13rem,14rem)_minmax(13rem,14rem)] lg:items-end">
+                        <div className="flex items-start gap-2 pr-1">
+                          <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-background">
+                            <CalendarRangeIcon className="size-4" />
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-sm font-medium text-foreground">
+                              Week ending range
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              Choose the first and last weekly snapshot to include.
+                            </span>
+                          </div>
+                        </div>
 
-                        if (
-                          nextValue === "7d" ||
-                          nextValue === "30d" ||
-                          nextValue === "weeks"
-                        ) {
-                          setTrendWindowMode(nextValue);
-                        }
-                      }}
-                      variant="outline"
-                      size="default"
-                      className="rounded-xl self-start"
-                    >
-                      <ToggleGroupItem
-                        value="7d"
-                        className="min-w-[8.75rem] justify-center px-4"
-                      >
-                        Last 7 days
-                      </ToggleGroupItem>
-                      <ToggleGroupItem
-                        value="30d"
-                        className="min-w-[8.75rem] justify-center px-4"
-                      >
-                        Last 30 days
-                      </ToggleGroupItem>
-                      <ToggleGroupItem
-                        value="weeks"
-                        className="min-w-[8.75rem] justify-center px-4"
-                      >
-                        Week range
-                      </ToggleGroupItem>
-                    </ToggleGroup>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                            Start week
+                          </span>
+                          <Select
+                            value={selectedWeekFrom ?? ""}
+                            onValueChange={(value) => {
+                              if (value !== null) {
+                                const nextFromIndex = weekIndexMap.get(value);
+                                const currentToIndex =
+                                  selectedWeekTo !== null
+                                    ? weekIndexMap.get(selectedWeekTo)
+                                    : undefined;
+
+                                setSelectedWeekFrom(value);
+
+                                if (
+                                  nextFromIndex !== undefined &&
+                                  currentToIndex !== undefined &&
+                                  nextFromIndex >= currentToIndex
+                                ) {
+                                  const nextToWeek =
+                                    dashboard.timeline[
+                                      Math.min(nextFromIndex + 1, dashboard.timeline.length - 1)
+                                    ]?.weekOf ?? null;
+
+                                  if (nextToWeek) {
+                                    setSelectedWeekTo(nextToWeek);
+                                  }
+                                }
+                              }
+                            }}
+                          >
+                            <SelectTrigger
+                              className="w-full bg-background"
+                              aria-label="Select start week ending date"
+                            >
+                              <SelectValue>
+                                {selectedWeekFrom
+                                  ? weekLabelMap.get(selectedWeekFrom)
+                                  : "Start week ending"}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                <SelectLabel>Start week ending</SelectLabel>
+                                {fromWeekOptions.map((option) => (
+                                  <SelectItem key={`from-${option.value}`} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                            End week
+                          </span>
+                          <Select
+                            value={selectedWeekTo ?? ""}
+                            onValueChange={(value) => {
+                              if (value !== null) {
+                                const nextToIndex = weekIndexMap.get(value);
+                                const currentFromIndex =
+                                  selectedWeekFrom !== null
+                                    ? weekIndexMap.get(selectedWeekFrom)
+                                    : undefined;
+
+                                setSelectedWeekTo(value);
+
+                                if (
+                                  nextToIndex !== undefined &&
+                                  currentFromIndex !== undefined &&
+                                  nextToIndex <= currentFromIndex
+                                ) {
+                                  const nextFromWeek =
+                                    dashboard.timeline[Math.max(nextToIndex - 1, 0)]?.weekOf ??
+                                    null;
+
+                                  if (nextFromWeek) {
+                                    setSelectedWeekFrom(nextFromWeek);
+                                  }
+                                }
+                              }
+                            }}
+                          >
+                            <SelectTrigger
+                              className="w-full bg-background"
+                              aria-label="Select end week ending date"
+                            >
+                              <SelectValue>
+                                {selectedWeekTo
+                                  ? weekLabelMap.get(selectedWeekTo)
+                                  : "End week ending"}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                <SelectLabel>End week ending</SelectLabel>
+                                {toWeekOptions.map((option) => (
+                                  <SelectItem key={`to-${option.value}`} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {activeForecast && predictionSummary ? (
+                      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                        <Badge variant="outline">Dashed lines = prediction</Badge>
+                        <span>{predictionSummary}</span>
+                      </div>
+                    ) : null}
                   </div>
-
-                  {trendWindowMode === "weeks" ? (
-                    <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5">
-                      <div className="flex min-w-[12rem] items-start gap-2 pr-1">
-                        <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-background">
-                          <CalendarRangeIcon className="size-4" />
-                        </div>
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-sm font-medium text-foreground">
-                            Week ending range
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            Choose the first and last weekly snapshot to include.
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex min-w-[12rem] flex-col gap-1">
-                        <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                          Start week
-                        </span>
-                        <Select
-                          value={selectedWeekFrom ?? undefined}
-                          onValueChange={(value) => {
-                            if (value !== null) {
-                              const nextFromIndex = weekIndexMap.get(value);
-                              const currentToIndex =
-                                selectedWeekTo !== null
-                                  ? weekIndexMap.get(selectedWeekTo)
-                                  : undefined;
-
-                              setSelectedWeekFrom(value);
-
-                              if (
-                                nextFromIndex !== undefined &&
-                                currentToIndex !== undefined &&
-                                nextFromIndex >= currentToIndex
-                              ) {
-                                const nextToWeek =
-                                  dashboard.timeline[
-                                    Math.min(nextFromIndex + 1, dashboard.timeline.length - 1)
-                                  ]?.weekOf ?? null;
-
-                                if (nextToWeek) {
-                                  setSelectedWeekTo(nextToWeek);
-                                }
-                              }
-                            }
-                          }}
-                        >
-                          <SelectTrigger
-                            className="w-full min-w-[12rem] bg-background"
-                            aria-label="Select start week ending date"
-                          >
-                            <SelectValue>
-                              {selectedWeekFrom
-                                ? weekLabelMap.get(selectedWeekFrom)
-                                : "Start week ending"}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectGroup>
-                              <SelectLabel>Start week ending</SelectLabel>
-                              {fromWeekOptions.map((option) => (
-                                <SelectItem key={`from-${option.value}`} value={option.value}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="flex min-w-[12rem] flex-col gap-1">
-                        <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                          End week
-                        </span>
-                        <Select
-                          value={selectedWeekTo ?? undefined}
-                          onValueChange={(value) => {
-                            if (value !== null) {
-                              const nextToIndex = weekIndexMap.get(value);
-                              const currentFromIndex =
-                                selectedWeekFrom !== null
-                                  ? weekIndexMap.get(selectedWeekFrom)
-                                  : undefined;
-
-                              setSelectedWeekTo(value);
-
-                              if (
-                                nextToIndex !== undefined &&
-                                currentFromIndex !== undefined &&
-                                nextToIndex <= currentFromIndex
-                              ) {
-                                const nextFromWeek =
-                                  dashboard.timeline[Math.max(nextToIndex - 1, 0)]?.weekOf ??
-                                  null;
-
-                                if (nextFromWeek) {
-                                  setSelectedWeekFrom(nextFromWeek);
-                                }
-                              }
-                            }
-                          }}
-                        >
-                          <SelectTrigger
-                            className="w-full min-w-[12rem] bg-background"
-                            aria-label="Select end week ending date"
-                          >
-                            <SelectValue>
-                              {selectedWeekTo
-                                ? weekLabelMap.get(selectedWeekTo)
-                                : "End week ending"}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectGroup>
-                              <SelectLabel>End week ending</SelectLabel>
-                              {toWeekOptions.map((option) => (
-                                <SelectItem key={`to-${option.value}`} value={option.value}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  ) : null}
                 </div>
               </div>
             ) : null}
@@ -1028,7 +1261,19 @@ export function DashboardWorkspace({
                     </CardHeader>
                   </Card>
 
-                  <OverviewSection dashboard={dashboard} timeline={filteredTimeline} />
+                  {activeForecast && predictionMode !== "off" ? (
+                    <ForecastCard
+                      forecast={activeForecast}
+                      predictionMode={predictionMode}
+                      projectionPoints={predictionProjectionPoints}
+                    />
+                  ) : null}
+
+                  <OverviewSection
+                    dashboard={dashboard}
+                    timeline={filteredTimeline}
+                    predictionMode={predictionMode}
+                  />
 
                   <MetricCardGrid
                     metricKeys={overviewMetricKeys}
@@ -1054,7 +1299,11 @@ export function DashboardWorkspace({
                       />
                     ))}
                   </div>
-                  <RevenueSection dashboard={dashboard} timeline={filteredTimeline} />
+                  <RevenueSection
+                    dashboard={dashboard}
+                    timeline={filteredTimeline}
+                    predictionMode={predictionMode}
+                  />
                 </>
               ) : (
                 <EmptyDashboardState onOpenWeeklyUpdate={() => setActiveTab("weekly-update")} />
@@ -1076,6 +1325,7 @@ export function DashboardWorkspace({
                     timeline={filteredTimeline}
                     lossReasonCounts={filteredLossReasonCounts}
                     repeatedRequestCounts={filteredRepeatedRequestCounts}
+                    predictionMode={predictionMode}
                   />
                 </>
               ) : (
@@ -1091,7 +1341,10 @@ export function DashboardWorkspace({
                     latestSnapshot={visibleLatestSnapshot!}
                     comparisonSnapshot={rangeStartSnapshot}
                   />
-                    <DeliverySection timeline={filteredTimeline} />
+                    <DeliverySection
+                      timeline={filteredTimeline}
+                      predictionMode={predictionMode}
+                    />
                 </>
               ) : (
                 <EmptyDashboardState onOpenWeeklyUpdate={() => setActiveTab("weekly-update")} />
@@ -1225,9 +1478,11 @@ function MetricCard({
 function OverviewSection({
   dashboard,
   timeline,
+  predictionMode,
 }: {
   dashboard: DashboardData;
   timeline: DashboardData["timeline"];
+  predictionMode: PredictionMode;
 }) {
   const hasAlerts = dashboard.healthAlerts.length > 0;
 
@@ -1239,7 +1494,7 @@ function OverviewSection({
           : "grid gap-4"
       }
     >
-      <PipelineMomentumCard timeline={timeline} compact />
+      <PipelineMomentumCard timeline={timeline} compact predictionMode={predictionMode} />
       {hasAlerts ? (
         <div className="flex flex-col gap-3">
           {dashboard.healthAlerts.map((alert) => (
@@ -1255,18 +1510,106 @@ function OverviewSection({
   );
 }
 
+function ForecastCard({
+  forecast,
+  predictionMode,
+  projectionPoints,
+}: {
+  forecast: DashboardForecast;
+  predictionMode: Exclude<PredictionMode, "off">;
+  projectionPoints: ForecastProjectionPoint[];
+}) {
+  const isSevenDayPrediction = predictionMode === "7d";
+  const predictionLabel = isSevenDayPrediction
+    ? "+7 day estimate"
+    : "4 weekly estimates";
+  const visibleProjectionPoints = isSevenDayPrediction
+    ? projectionPoints.slice(0, 1)
+    : projectionPoints.slice(0, 4);
+
+  return (
+    <Card className="border-border bg-card shadow-none">
+      <CardHeader className="gap-2">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <CardTitle>Prediction</CardTitle>
+            <CardDescription>
+              {isSevenDayPrediction
+                ? "Directional +7 day estimate based on the latest saved weekly history."
+                : "Directional 30 day view shown as four weekly prediction checkpoints."}{" "}
+              Dashed chart lines use the same projection.
+            </CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Badge>{predictionLabel}</Badge>
+            <Badge variant="outline">{forecast.generatedFromWeeks} weeks used</Badge>
+            <Badge variant="outline">{forecast.confidenceLabel}</Badge>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Metric</TableHead>
+              <TableHead className="text-right">Latest</TableHead>
+              {visibleProjectionPoints.length ? (
+                visibleProjectionPoints.map((point) => (
+                  <TableHead key={point.weekOf} className="text-right">
+                    +{point.daysAhead}d
+                  </TableHead>
+                ))
+              ) : (
+                <TableHead className="text-right">{predictionLabel}</TableHead>
+              )}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {forecast.metrics.map((metric) => (
+              <TableRow key={metric.metricKey}>
+                <TableCell className="font-medium">{metric.label}</TableCell>
+                <TableCell className="text-right">
+                  {formatMetricByKey(metric.metricKey, metric.latestValue)}
+                </TableCell>
+                {visibleProjectionPoints.length ? (
+                  visibleProjectionPoints.map((point) => (
+                    <TableCell key={point.weekOf} className="text-right">
+                      {formatMetricByKey(
+                        metric.metricKey,
+                        point.values[metric.metricKey] ?? metric.latestValue,
+                      )}
+                    </TableCell>
+                  ))
+                ) : (
+                  <TableCell className="text-right">
+                    {isSevenDayPrediction
+                      ? metric.forecast7dLabel
+                      : metric.forecast30dLabel}
+                  </TableCell>
+                )}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
 function RevenueSection({
   dashboard,
   timeline,
+  predictionMode,
 }: {
   dashboard: DashboardData;
   timeline: DashboardData["timeline"];
+  predictionMode: PredictionMode;
 }) {
   return (
     <>
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-        <PipelineMomentumCard timeline={timeline} />
-        <RevenueConversionCard timeline={timeline} />
+        <PipelineMomentumCard timeline={timeline} predictionMode={predictionMode} />
+        <RevenueConversionCard timeline={timeline} predictionMode={predictionMode} />
       </div>
       <StageFlowCard stageMetrics={dashboard.latestStageMetrics} />
     </>
@@ -1277,14 +1620,16 @@ function ProductSignalSection({
   timeline,
   lossReasonCounts,
   repeatedRequestCounts,
+  predictionMode,
 }: {
   timeline: DashboardData["timeline"];
   lossReasonCounts: RankedTextItem[];
   repeatedRequestCounts: RankedTextItem[];
+  predictionMode: PredictionMode;
 }) {
   return (
     <>
-      <RetentionSignalCard timeline={timeline} />
+      <RetentionSignalCard timeline={timeline} predictionMode={predictionMode} />
       <div className="grid gap-4 xl:grid-cols-2">
         <RankedSignalsCard
           title="Why deals are lost"
@@ -1303,13 +1648,15 @@ function ProductSignalSection({
 
 function DeliverySection({
   timeline,
+  predictionMode,
 }: {
   timeline: DashboardData["timeline"];
+  predictionMode: PredictionMode;
 }) {
   return (
     <div className="grid gap-4 xl:grid-cols-2">
-      <DeliveryVolumeCard timeline={timeline} />
-      <DeliveryReliabilityCard timeline={timeline} />
+      <DeliveryVolumeCard timeline={timeline} predictionMode={predictionMode} />
+      <DeliveryReliabilityCard timeline={timeline} predictionMode={predictionMode} />
     </div>
   );
 }
@@ -1340,12 +1687,16 @@ function WeeklyUpdateSection({
           <CardContent className="flex flex-col gap-3 text-sm text-muted-foreground">
             <p>Use one full snapshot per Friday week-ending date.</p>
             <p>
-              Re-saving the same week replaces the existing record instead of
-              creating duplicates.
+              Re-saving the same week creates a new revision while keeping the
+              earlier saved version available in history.
             </p>
             <p>
               Keep lost reasons tight and specific, and add recurring requests
               one request per line.
+            </p>
+            <p>
+              Pipeline velocity is calculated automatically from the saved data
+              model, so you do not need to type it manually.
             </p>
           </CardContent>
         </Card>
@@ -1431,6 +1782,126 @@ function ChartViewToggle<T extends string>({
         ))}
       </ToggleGroup>
     </div>
+  );
+}
+
+function ForesightLine({
+  metricKey,
+  stroke,
+  strokeWidth,
+  animationIndex,
+  yAxisId,
+}: {
+  metricKey: NumericMetricKey;
+  stroke: string;
+  strokeWidth: number;
+  animationIndex: number;
+  yAxisId?: string;
+}) {
+  return (
+    <PredictionLine
+      dataKey={getForesightDataKey(metricKey)}
+      name={metricKey}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      animationIndex={animationIndex}
+      yAxisId={yAxisId}
+    />
+  );
+}
+
+function PredictionLine({
+  dataKey,
+  name,
+  stroke,
+  strokeWidth,
+  animationIndex,
+  yAxisId,
+}: {
+  dataKey: string;
+  name: string;
+  stroke: string;
+  strokeWidth: number;
+  animationIndex: number;
+  yAxisId?: string;
+}) {
+  return (
+    <Line
+      yAxisId={yAxisId}
+      type="monotone"
+      dataKey={dataKey}
+      name={name}
+      legendType="none"
+      stroke={stroke}
+      strokeOpacity={0.88}
+      strokeWidth={strokeWidth}
+      strokeDasharray="8 6"
+      dot={false}
+      activeDot={{
+        r: 4,
+        fill: stroke,
+        stroke: "var(--background)",
+        strokeWidth: 2,
+      }}
+      connectNulls={false}
+      {...getSeriesAnimationProps(animationIndex)}
+    />
+  );
+}
+
+function PredictionArea({
+  dataKey,
+  fill,
+  animationIndex,
+  fillOpacity = 0.12,
+  yAxisId,
+}: {
+  dataKey: string;
+  fill: string;
+  animationIndex: number;
+  fillOpacity?: number;
+  yAxisId?: string;
+}) {
+  return (
+    <Area
+      yAxisId={yAxisId}
+      type="monotone"
+      dataKey={dataKey}
+      legendType="none"
+      stroke="none"
+      fill={fill}
+      fillOpacity={fillOpacity}
+      activeDot={false}
+      connectNulls={false}
+      {...getSeriesAnimationProps(animationIndex)}
+    />
+  );
+}
+
+function PredictionRegion({
+  timeline,
+}: {
+  timeline: ReadonlyArray<{
+    label?: string | number;
+    isForesight?: boolean;
+  }>;
+}) {
+  const latestActualPoint = [...timeline].reverse().find((point) => !point.isForesight);
+  const lastPoint = timeline.at(-1);
+
+  if (!latestActualPoint?.label || !lastPoint?.label || !timeline.some((point) => point.isForesight)) {
+    return null;
+  }
+
+  return (
+    <ReferenceArea
+      x1={latestActualPoint.label}
+      x2={lastPoint.label}
+      fill="var(--muted)"
+      fillOpacity={0.16}
+      strokeOpacity={0}
+      ifOverflow="extendDomain"
+    />
   );
 }
 
@@ -1543,9 +2014,11 @@ function ShortRangeComparisonChart<TPoint extends { weekOf: string }>({
 function PipelineMomentumCard({
   timeline,
   compact = false,
+  predictionMode = "off",
 }: {
   timeline: DashboardData["timeline"];
   compact?: boolean;
+  predictionMode?: PredictionMode;
 }) {
   const [view, setView] = React.useState<"combined" | "value" | "velocity">(
     "combined",
@@ -1566,7 +2039,20 @@ function PipelineMomentumCard({
   const isShortRange = isShortRangeTimeline(timeline);
   const showValue = view !== "velocity";
   const showVelocity = view !== "value";
-  const chartAnimationKey = getTimelineAnimationKey(timeline, view);
+  const chartTimeline = React.useMemo(
+    () =>
+      predictionMode !== "off"
+        ? buildPredictionChartTimeline(timeline, [
+            "pipelineValue",
+            "pipelineVelocity",
+          ], predictionMode)
+        : (timeline as ForesightChartPoint[]),
+    [predictionMode, timeline],
+  );
+  const chartAnimationKey = getTimelineAnimationKey(
+    chartTimeline,
+    `${view}-${predictionMode}`,
+  );
 
   return (
     <Card className="border-border bg-card shadow-none">
@@ -1619,11 +2105,22 @@ function PipelineMomentumCard({
               "animate-chart-load",
             )}
           >
-            <ComposedChart accessibilityLayer data={timeline} margin={defaultChartMargin}>
+            <ComposedChart accessibilityLayer data={chartTimeline} margin={defaultChartMargin}>
               <defs>
                 <linearGradient id="pipelineValueFill" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="var(--color-pipelineValue)" stopOpacity={0.28} />
                   <stop offset="95%" stopColor="var(--color-pipelineValue)" stopOpacity={0.03} />
+                </linearGradient>
+                <linearGradient
+                  id="pipelineValueForecastFill"
+                  x1="0"
+                  y1="0"
+                  x2="1"
+                  y2="0"
+                >
+                  <stop offset="0%" stopColor="var(--color-pipelineValue)" stopOpacity={0.015} />
+                  <stop offset="35%" stopColor="var(--color-pipelineValue)" stopOpacity={0.045} />
+                  <stop offset="100%" stopColor="var(--color-pipelineValue)" stopOpacity={0.095} />
                 </linearGradient>
               </defs>
               <CartesianGrid vertical={false} strokeDasharray="4 6" />
@@ -1651,34 +2148,76 @@ function PipelineMomentumCard({
                   orientation="right"
                   tickLine={false}
                   axisLine={false}
-                  width={64}
-                  tickFormatter={formatCurrencyTick}
+                width={64}
+                tickFormatter={formatCurrencyTick}
+              />
+              ) : null}
+              {predictionMode !== "off" && !showValue ? (
+                <PredictionRegion timeline={chartTimeline} />
+              ) : null}
+              {predictionMode !== "off" && latestPoint ? (
+                <ReferenceLine
+                  x={latestPoint.label}
+                  stroke="var(--border)"
+                  strokeDasharray="2 6"
                 />
               ) : null}
               <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    labelFormatter={(label) => `Week ending ${label}`}
-                    formatter={(value, name) => (
-                      <div className="flex flex-1 items-center justify-between gap-3">
-                        <span className="text-muted-foreground">
-                          {
-                            pipelineMomentumConfig[
-                              String(name) as keyof typeof pipelineMomentumConfig
-                            ]?.label
-                          }
-                        </span>
-                        <span className="font-mono font-medium text-foreground">
-                          {formatMetricByKey(
-                            String(name) as NumericMetricKey,
-                            Number(value),
-                          )}
-                        </span>
-                      </div>
-                    )}
-                    indicator="dot"
-                  />
-                }
+                content={({ active, label, payload }) => {
+                  const filteredPayload = (payload ?? []).filter((item) => {
+                    if (item.value == null) {
+                      return false;
+                    }
+
+                    return typeof item.value !== "number" || Number.isFinite(item.value);
+                  });
+
+                  if (!active || !filteredPayload.length) {
+                    return null;
+                  }
+
+                  return (
+                    <ChartTooltipContent
+                      active={active}
+                      label={filteredPayload[0]?.payload?.label ?? label}
+                      payload={filteredPayload}
+                      labelFormatter={(tooltipLabel, items) =>
+                        formatPredictionTooltipLabel(
+                          String(tooltipLabel),
+                          items as ReadonlyArray<{
+                            payload?: {
+                              isForesight?: boolean;
+                              predictionDaysAhead?: number;
+                            };
+                          }>,
+                        )
+                      }
+                      formatter={(value, name, item, _index, point) => {
+                        const metricKey = normalizePredictionMetricKey(
+                          String(item.dataKey ?? name),
+                        );
+                        const itemLabel =
+                          pipelineMomentumConfig[
+                            metricKey as keyof typeof pipelineMomentumConfig
+                          ]?.label ?? metricFieldMap[metricKey].shortLabel;
+                        const pointData = point as unknown as ForesightChartPoint | undefined;
+                        const isPredictionPoint = Boolean(pointData?.isForesight);
+
+                        return (
+                          <div className="flex flex-1 items-center justify-between gap-3">
+                            <span className="text-muted-foreground">
+                              {isPredictionPoint ? `${itemLabel} estimate` : itemLabel}
+                            </span>
+                            <span className="font-mono font-medium text-foreground">
+                              {formatMetricByKey(metricKey, Number(value))}
+                            </span>
+                          </div>
+                        );
+                      }}
+                      indicator="dot"
+                    />
+                  );
+                }}
               />
               <ChartLegend
                 verticalAlign="top"
@@ -1719,6 +2258,33 @@ function PipelineMomentumCard({
                   {...getSeriesAnimationProps(1)}
                 />
               ) : null}
+              {predictionMode !== "off" && showValue ? (
+                <PredictionArea
+                  dataKey={getPredictionAreaDataKey("pipelineValue")}
+                  yAxisId="left"
+                  fill="url(#pipelineValueForecastFill)"
+                  fillOpacity={1}
+                  animationIndex={2}
+                />
+              ) : null}
+              {predictionMode !== "off" && showValue ? (
+                <ForesightLine
+                  metricKey="pipelineValue"
+                  yAxisId="left"
+                  stroke="var(--color-pipelineValue)"
+                  strokeWidth={getAdaptiveLineStrokeWidth(chartTimeline, 2.35)}
+                  animationIndex={3}
+                />
+              ) : null}
+              {predictionMode !== "off" && showVelocity ? (
+                <ForesightLine
+                  metricKey="pipelineVelocity"
+                  yAxisId="right"
+                  stroke="var(--color-pipelineVelocity)"
+                  strokeWidth={getAdaptiveLineStrokeWidth(chartTimeline, 2.6)}
+                  animationIndex={4}
+                />
+              ) : null}
             </ComposedChart>
           </ChartContainer>
         </div>
@@ -1729,8 +2295,10 @@ function PipelineMomentumCard({
 
 function RevenueConversionCard({
   timeline,
+  predictionMode = "off",
 }: {
   timeline: DashboardData["timeline"];
+  predictionMode?: PredictionMode;
 }) {
   const latestPoint = timeline.at(-1);
   const baselinePoint = timeline.length > 1 ? timeline[0] ?? null : null;
@@ -1765,7 +2333,22 @@ function RevenueConversionCard({
     ["pipelineCoverageRatio"],
     { minimum: 3, padding: 0.5, roundTo: 0.5 },
   );
-  const chartAnimationKey = getTimelineAnimationKey(timeline, "revenue");
+  const chartTimeline = React.useMemo(
+    () =>
+      predictionMode !== "off"
+        ? buildPredictionChartTimeline(timeline, [
+            "marketingSourcedPipelinePct",
+            "leadToOpportunityConversionPct",
+            "closeRatePct",
+            "pipelineCoverageRatio",
+          ], predictionMode)
+        : (timeline as ForesightChartPoint[]),
+    [predictionMode, timeline],
+  );
+  const chartAnimationKey = getTimelineAnimationKey(
+    chartTimeline,
+    `revenue-${predictionMode}`,
+  );
 
   return (
     <Card className="border-border bg-card shadow-none">
@@ -1815,7 +2398,7 @@ function RevenueConversionCard({
             config={conversionConfig}
             className="h-[332px] w-full animate-chart-load"
           >
-            <ComposedChart accessibilityLayer data={timeline} margin={defaultChartMargin}>
+            <ComposedChart accessibilityLayer data={chartTimeline} margin={defaultChartMargin}>
               <defs>
                 <linearGradient id="marketingSourcedFill" x1="0" y1="0" x2="0" y2="1">
                   <stop
@@ -1864,36 +2447,94 @@ function RevenueConversionCard({
                 stroke="var(--border)"
                 strokeDasharray="4 6"
               />
+              {predictionMode !== "off" ? (
+                <PredictionRegion timeline={chartTimeline} />
+              ) : null}
+              {predictionMode !== "off" && latestPoint ? (
+                <ReferenceLine
+                  x={latestPoint.label}
+                  stroke="var(--border)"
+                  strokeDasharray="2 6"
+                />
+              ) : null}
               <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    labelFormatter={(label) => `Week ending ${label}`}
-                    formatter={(value, name) => {
-                      const key = String(name);
+                content={({ active, label, payload }) => {
+                  const filteredPayload = (payload ?? []).filter((item) => {
+                    if (item.value == null) {
+                      return false;
+                    }
 
-                      const labelMap: Record<string, string> = {
-                        marketingSourcedPipelinePct: "Marketing-sourced pipeline",
-                        leadToOpportunityConversionPct: "Lead to opportunity",
-                        closeRatePct: "Close rate",
-                        pipelineCoverageRatio: "Coverage ratio",
-                      };
+                    return typeof item.value !== "number" || Number.isFinite(item.value);
+                  });
 
-                      const formattedValue =
-                        key === "pipelineCoverageRatio"
-                          ? `${Number(value).toFixed(1)}x`
-                          : formatMetricByKey(key as NumericMetricKey, Number(value));
+                  if (!active || !filteredPayload.length) {
+                    return null;
+                  }
 
-                      return (
-                        <div className="flex flex-1 items-center justify-between gap-3">
-                          <span className="text-muted-foreground">{labelMap[key]}</span>
-                          <span className="font-mono font-medium text-foreground">
-                            {formattedValue}
-                          </span>
-                        </div>
-                      );
-                    }}
-                  />
-                }
+                  return (
+                    <ChartTooltipContent
+                      active={active}
+                      label={filteredPayload[0]?.payload?.label ?? label}
+                      payload={filteredPayload}
+                      labelFormatter={(tooltipLabel, items) =>
+                        formatPredictionTooltipLabel(
+                          String(tooltipLabel),
+                          items as ReadonlyArray<{
+                            payload?: {
+                              isForesight?: boolean;
+                              predictionDaysAhead?: number;
+                            };
+                          }>,
+                        )
+                      }
+                      formatter={(value, name, item, _index, point) => {
+                        const metricKey = normalizePredictionMetricKey(
+                          String(item.dataKey ?? name),
+                        );
+                        const labelMap: Record<NumericMetricKey, string> = {
+                          marketingSourcedPipelinePct: "Marketing-sourced pipeline",
+                          leadToOpportunityConversionPct: "Lead to opportunity",
+                          closeRatePct: "Close rate",
+                          pipelineCoverageRatio: "Coverage ratio",
+                          pipelineValue: "Pipeline value",
+                          pipelineVelocity: "Pipeline velocity",
+                          newCustomersPerMonth: "New customers",
+                          salesCycleDays: "Sales cycle",
+                          averageDealSize: "Avg deal size",
+                          customerAcquisitionCost: "CAC",
+                          netRevenueRetentionPct: "NRR",
+                          grossRevenueRetentionPct: "GRR",
+                          marketingSourcedPipelineCount: "Marketing-sourced #",
+                          cacPaybackMonths: "CAC payback",
+                          feedRetentionPct: "Feed retention",
+                          proposalsSent: "Proposals sent",
+                          ordersWon: "Orders won",
+                          feedSlaQualityScore: "Feed SLA",
+                          incidentCount: "Incident count",
+                        };
+                        const formattedValue =
+                          metricKey === "pipelineCoverageRatio"
+                            ? `${Number(value).toFixed(1)}x`
+                            : formatMetricByKey(metricKey, Number(value));
+                        const pointData = point as unknown as ForesightChartPoint | undefined;
+                        const isPredictionPoint = Boolean(pointData?.isForesight);
+
+                        return (
+                          <div className="flex flex-1 items-center justify-between gap-3">
+                            <span className="text-muted-foreground">
+                              {isPredictionPoint
+                                ? `${labelMap[metricKey]} estimate`
+                                : labelMap[metricKey]}
+                            </span>
+                            <span className="font-mono font-medium text-foreground">
+                              {formattedValue}
+                            </span>
+                          </div>
+                        );
+                      }}
+                    />
+                  );
+                }}
               />
               <ChartLegend
                 verticalAlign="top"
@@ -1962,6 +2603,45 @@ function RevenueConversionCard({
                 }}
                 {...getSeriesAnimationProps(3)}
               />
+              {predictionMode !== "off" ? (
+                <>
+                  <PredictionArea
+                    dataKey={getPredictionAreaDataKey("marketingSourcedPipelinePct")}
+                    yAxisId="left"
+                    fill="var(--color-marketingSourcedPipelinePct)"
+                    fillOpacity={0.11}
+                    animationIndex={4}
+                  />
+                  <ForesightLine
+                    metricKey="marketingSourcedPipelinePct"
+                    yAxisId="left"
+                    stroke="var(--color-marketingSourcedPipelinePct)"
+                    strokeWidth={getAdaptiveLineStrokeWidth(chartTimeline, 2.25)}
+                    animationIndex={5}
+                  />
+                  <ForesightLine
+                    metricKey="leadToOpportunityConversionPct"
+                    yAxisId="left"
+                    stroke="var(--color-leadToOpportunityConversionPct)"
+                    strokeWidth={getAdaptiveLineStrokeWidth(chartTimeline, 2.2)}
+                    animationIndex={6}
+                  />
+                  <ForesightLine
+                    metricKey="closeRatePct"
+                    yAxisId="left"
+                    stroke="var(--color-closeRatePct)"
+                    strokeWidth={getAdaptiveLineStrokeWidth(chartTimeline, 2.5)}
+                    animationIndex={7}
+                  />
+                  <ForesightLine
+                    metricKey="pipelineCoverageRatio"
+                    yAxisId="right"
+                    stroke="var(--color-pipelineCoverageRatio)"
+                    strokeWidth={getAdaptiveLineStrokeWidth(chartTimeline, 2.1)}
+                    animationIndex={8}
+                  />
+                </>
+              ) : null}
             </ComposedChart>
           </ChartContainer>
         </div>
@@ -2017,8 +2697,10 @@ function StageFlowCard({
 
 function RetentionSignalCard({
   timeline,
+  predictionMode = "off",
 }: {
   timeline: DashboardData["timeline"];
+  predictionMode?: PredictionMode;
 }) {
   const [view, setView] = React.useState<"all" | "customer" | "revenue">(
     "all",
@@ -2043,7 +2725,21 @@ function RetentionSignalCard({
   );
   const showFeed = view !== "revenue";
   const showGrossRevenue = view !== "customer";
-  const chartAnimationKey = getTimelineAnimationKey(timeline, view);
+  const chartTimeline = React.useMemo(
+    () =>
+      predictionMode !== "off"
+        ? buildPredictionChartTimeline(timeline, [
+            "feedRetentionPct",
+            "netRevenueRetentionPct",
+            "grossRevenueRetentionPct",
+          ], predictionMode)
+        : (timeline as ForesightChartPoint[]),
+    [predictionMode, timeline],
+  );
+  const chartAnimationKey = getTimelineAnimationKey(
+    chartTimeline,
+    `${view}-${predictionMode}`,
+  );
 
   return (
     <Card className="border-border bg-card shadow-none">
@@ -2099,7 +2795,7 @@ function RetentionSignalCard({
             config={retentionConfig}
             className="h-[332px] w-full animate-chart-load"
           >
-            <ComposedChart accessibilityLayer data={timeline} margin={defaultChartMargin}>
+            <ComposedChart accessibilityLayer data={chartTimeline} margin={defaultChartMargin}>
               <defs>
                 <linearGradient id="feedRetentionFill" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="var(--color-feedRetentionPct)" stopOpacity={0.22} />
@@ -2132,9 +2828,19 @@ function RetentionSignalCard({
               tickFormatter={(value) => `${value}%`}
             />
             <ReferenceLine y={100} stroke="var(--border)" strokeDasharray="4 6" />
+            {predictionMode !== "off" && latestPoint ? (
+              <PredictionRegion timeline={chartTimeline} />
+            ) : null}
+            {predictionMode !== "off" && latestPoint ? (
+              <ReferenceLine
+                x={latestPoint.label}
+                stroke="var(--border)"
+                strokeDasharray="2 6"
+              />
+            ) : null}
             <ChartTooltip
               itemSorter={(item) => {
-                const dataKey = String(item.dataKey);
+                const dataKey = normalizePredictionMetricKey(String(item.dataKey));
 
                 return (
                   retentionTooltipOrder[
@@ -2142,24 +2848,68 @@ function RetentionSignalCard({
                   ] ?? 99
                 );
               }}
-              content={
-                <ChartTooltipContent
-                  labelFormatter={(label) => `Week ending ${label}`}
-                  formatter={(value, name) => (
-                    <div className="flex flex-1 items-center justify-between gap-3">
-                      <span className="text-muted-foreground">
-                        {retentionConfig[String(name) as keyof typeof retentionConfig]?.label}
-                      </span>
-                      <span className="font-mono font-medium text-foreground">
-                        {formatMetricByKey(
-                          String(name) as NumericMetricKey,
-                          Number(value),
-                        )}
-                      </span>
-                    </div>
-                  )}
-                />
-              }
+              content={({ active, label, payload }) => {
+                const filteredPayload = (payload ?? []).filter((item) => {
+                  if (item.value == null) {
+                    return false;
+                  }
+
+                  return typeof item.value !== "number" || Number.isFinite(item.value);
+                });
+
+                if (!active || !filteredPayload.length) {
+                  return null;
+                }
+
+                return (
+                  <ChartTooltipContent
+                    active={active}
+                    label={filteredPayload[0]?.payload?.label ?? label}
+                    payload={filteredPayload}
+                    itemSorter={(item) => {
+                      const dataKey = normalizePredictionMetricKey(String(item.dataKey));
+
+                      return (
+                        retentionTooltipOrder[
+                          dataKey as keyof typeof retentionTooltipOrder
+                        ] ?? 99
+                      );
+                    }}
+                    labelFormatter={(tooltipLabel, items) =>
+                      formatPredictionTooltipLabel(
+                        String(tooltipLabel),
+                        items as ReadonlyArray<{
+                          payload?: {
+                            isForesight?: boolean;
+                            predictionDaysAhead?: number;
+                          };
+                        }>,
+                      )
+                    }
+                    formatter={(value, name, item, _index, point) => {
+                      const metricKey = normalizePredictionMetricKey(
+                        String(item.dataKey ?? name),
+                      );
+                      const itemLabel =
+                        retentionConfig[metricKey as keyof typeof retentionConfig]?.label ??
+                        metricFieldMap[metricKey].shortLabel;
+                      const pointData = point as unknown as ForesightChartPoint | undefined;
+                      const isPredictionPoint = Boolean(pointData?.isForesight);
+
+                      return (
+                        <div className="flex flex-1 items-center justify-between gap-3">
+                          <span className="text-muted-foreground">
+                            {isPredictionPoint ? `${itemLabel} estimate` : itemLabel}
+                          </span>
+                          <span className="font-mono font-medium text-foreground">
+                            {formatMetricByKey(metricKey, Number(value))}
+                          </span>
+                        </div>
+                      );
+                    }}
+                  />
+                );
+              }}
             />
               <ChartLegend
                 verticalAlign="top"
@@ -2211,6 +2961,46 @@ function RetentionSignalCard({
                     strokeWidth: 2,
                   }}
                   {...getSeriesAnimationProps(2)}
+                />
+              ) : null}
+              {predictionMode !== "off" && showFeed ? (
+                <PredictionArea
+                  dataKey={getPredictionAreaDataKey("feedRetentionPct")}
+                  fill="var(--color-feedRetentionPct)"
+                  fillOpacity={0.11}
+                  animationIndex={3}
+                />
+              ) : null}
+              {predictionMode !== "off" && showFeed ? (
+                <ForesightLine
+                  metricKey="feedRetentionPct"
+                  stroke="var(--color-feedRetentionPct)"
+                  strokeWidth={getAdaptiveLineStrokeWidth(chartTimeline, 2.25)}
+                  animationIndex={4}
+                />
+              ) : null}
+              {predictionMode !== "off" ? (
+                <PredictionArea
+                  dataKey={getPredictionAreaDataKey("netRevenueRetentionPct")}
+                  fill="var(--color-netRevenueRetentionPct)"
+                  fillOpacity={0.1}
+                  animationIndex={5}
+                />
+              ) : null}
+              {predictionMode !== "off" ? (
+                <ForesightLine
+                  metricKey="netRevenueRetentionPct"
+                  stroke="var(--color-netRevenueRetentionPct)"
+                  strokeWidth={getAdaptiveLineStrokeWidth(chartTimeline, 2.25)}
+                  animationIndex={6}
+                />
+              ) : null}
+              {predictionMode !== "off" && showGrossRevenue ? (
+                <ForesightLine
+                  metricKey="grossRevenueRetentionPct"
+                  stroke="var(--color-grossRevenueRetentionPct)"
+                  strokeWidth={getAdaptiveLineStrokeWidth(chartTimeline, 2.25)}
+                  animationIndex={7}
                 />
               ) : null}
             </ComposedChart>
@@ -2279,61 +3069,78 @@ function RankedSignalsCard({
 
 function DeliveryVolumeCard({
   timeline,
+  predictionMode = "off",
 }: {
   timeline: DashboardData["timeline"];
+  predictionMode?: PredictionMode;
 }) {
   const [view, setView] = React.useState<"throughput" | "win-rate">(
     "throughput",
   );
-  const volumeTimeline = React.useMemo(
-    () =>
-      timeline.map((point, index) => ({
-        ...point,
-        rangePosition:
-          timeline.length > 1 ? index / (timeline.length - 1) : 0,
-        proposalWinRatePct:
-          point.proposalsSent > 0 ? (point.ordersWon / point.proposalsSent) * 100 : 0,
-      })),
-    [timeline],
+  const chartTimeline = React.useMemo(
+    () => buildDeliveryVolumeChartTimeline(timeline, predictionMode),
+    [predictionMode, timeline],
   );
   const latestPoint = timeline.at(-1);
   const baselinePoint = timeline.length > 1 ? timeline[0] ?? null : null;
-  const tickGap = getAdaptiveTickGap(timeline);
-  const isShortRange = isShortRangeTimeline(timeline);
-  const xAxisPadding = getAdaptiveXAxisPadding(timeline);
-  const throughputXAxisPadding =
-    view === "throughput" && isShortRange ? { left: 20, right: 20 } : xAxisPadding;
-  const throughputXAxisScale = view === "throughput" ? undefined : isShortRange ? "point" : undefined;
-  const throughputTrendXAxisId = isShortRange ? "edge" : "bars";
-  const useTwoPointThroughputBars = isShortRange && view === "throughput";
-  const curveType = getAdaptiveCurveType(timeline);
+  const latestProposalWinRate = latestPoint
+    ? calculateProposalWinRate(latestPoint.proposalsSent, latestPoint.ordersWon)
+    : null;
+  const baselineProposalWinRate = baselinePoint
+    ? calculateProposalWinRate(baselinePoint.proposalsSent, baselinePoint.ordersWon)
+    : null;
+  const latestActualPoint =
+    [...chartTimeline].reverse().find((point) => !point.isForesight) ??
+    chartTimeline.at(-1) ??
+    null;
+  const tickGap = getAdaptiveTickGap(chartTimeline);
+  const xAxisPadding = getAdaptiveXAxisPadding(chartTimeline);
+  const curveType = getAdaptiveCurveType(chartTimeline);
+  const proposalsDot = getAdaptiveLineDot(
+    "var(--color-proposalsSent)",
+    chartTimeline,
+  );
+  const ordersDot = getAdaptiveLineDot("var(--color-ordersWon)", chartTimeline);
   const proposalWinRateDot = getAdaptiveLineDot(
     "var(--color-proposalWinRatePct)",
-    volumeTimeline,
+    chartTimeline,
   );
-  const latestVolumePoint = volumeTimeline.at(-1);
-  const baselineVolumePoint = volumeTimeline.length > 1 ? volumeTimeline[0] ?? null : null;
-  const proposalsAxisMax = getMetricUpperBound(
-    timeline,
-    ["proposalsSent"],
-    { minimum: 16, padding: 2, roundTo: 2 },
-  );
-  const winRateAxisMax = React.useMemo(() => {
-    const maxRate = volumeTimeline.reduce(
-      (currentMax, point) => Math.max(currentMax, point.proposalWinRatePct),
+  const proposalsAxisMax = React.useMemo(() => {
+    const maxValue = chartTimeline.reduce(
+      (currentMax, point) =>
+        Math.max(
+          currentMax,
+          Number(point.proposalsSent ?? 0),
+          Number(point.ordersWon ?? 0),
+          Number(point.proposalsSentForesight ?? 0),
+          Number(point.ordersWonForesight ?? 0),
+        ),
       0,
     );
 
-    return Math.min(60, Math.max(30, Math.ceil((maxRate + 4) / 5) * 5));
-  }, [volumeTimeline]);
+    return Math.max(10, Math.ceil((maxValue + 2) / 2) * 2);
+  }, [chartTimeline]);
+  const winRateAxisMax = React.useMemo(() => {
+    const maxRate = chartTimeline.reduce(
+      (currentMax, point) =>
+        Math.max(
+          currentMax,
+          Number(point.proposalWinRatePct ?? 0),
+          Number(point.proposalWinRatePctForesight ?? 0),
+        ),
+      0,
+    );
+
+    return Math.min(100, Math.max(30, Math.ceil((maxRate + 5) / 5) * 5));
+  }, [chartTimeline]);
   const deliveryTooltipLabelMap: Record<string, string> = {
     proposalsSent: "Proposals sent",
     ordersWon: "Orders won",
     proposalWinRatePct: "Proposal win rate",
   };
   const chartAnimationKey = getTimelineAnimationKey(
-    volumeTimeline,
-    `${view}-${useTwoPointThroughputBars ? "bars" : "mixed"}`,
+    chartTimeline,
+    `delivery-volume-${view}-${predictionMode}`,
   );
 
   return (
@@ -2357,32 +3164,28 @@ function DeliveryVolumeCard({
             onValueChange={setView}
           />
         </div>
-        {latestPoint && latestVolumePoint ? (
+        {latestPoint && latestProposalWinRate !== null ? (
           <ChartStatRow
             items={[
-              {
-                ...createChartStatItem(
-                  "proposalsSent",
-                  "Proposals",
-                  latestPoint.proposalsSent,
-                  baselinePoint?.proposalsSent,
-                ),
-              },
-              {
-                ...createChartStatItem(
-                  "ordersWon",
-                  "Orders won",
-                  latestPoint.ordersWon,
-                  baselinePoint?.ordersWon,
-                ),
-              },
+              createChartStatItem(
+                "proposalsSent",
+                "Proposals",
+                latestPoint.proposalsSent,
+                baselinePoint?.proposalsSent,
+              ),
+              createChartStatItem(
+                "ordersWon",
+                "Orders won",
+                latestPoint.ordersWon,
+                baselinePoint?.ordersWon,
+              ),
               {
                 label: "Win rate",
-                value: formatMetricValue(latestVolumePoint.proposalWinRatePct, "percent"),
+                value: formatMetricValue(latestProposalWinRate, "percent"),
                 comparison: getRangeComparison(
                   "up",
-                  latestVolumePoint.proposalWinRatePct,
-                  baselineVolumePoint?.proposalWinRatePct,
+                  latestProposalWinRate,
+                  baselineProposalWinRate,
                 ),
               },
             ]}
@@ -2396,55 +3199,26 @@ function DeliveryVolumeCard({
             config={deliveryVolumeConfig}
             className="h-[312px] w-full animate-chart-load"
           >
-            <ComposedChart
-              accessibilityLayer
-              data={volumeTimeline}
-              margin={defaultChartMargin}
-              barCategoryGap={
-                view === "throughput"
-                  ? isShortRange
-                    ? "12%"
-                    : "8%"
-                  : isShortRange
-                    ? "8%"
-                    : "18%"
-              }
-              barGap={view === "throughput" ? (isShortRange ? 8 : 4) : 0}
-            >
+            <ComposedChart accessibilityLayer data={chartTimeline} margin={defaultChartMargin}>
               <defs>
                 <linearGradient id="proposalsFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--color-proposalsSent)" stopOpacity={0.82} />
-                  <stop offset="100%" stopColor="var(--color-proposalsSent)" stopOpacity={0.16} />
-                </linearGradient>
-                <linearGradient id="ordersFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--color-ordersWon)" stopOpacity={0.9} />
-                  <stop offset="100%" stopColor="var(--color-ordersWon)" stopOpacity={0.24} />
+                  <stop offset="5%" stopColor="var(--color-proposalsSent)" stopOpacity={0.24} />
+                  <stop offset="100%" stopColor="var(--color-proposalsSent)" stopOpacity={0.03} />
                 </linearGradient>
                 <linearGradient id="winRateFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--color-proposalWinRatePct)" stopOpacity={0.22} />
+                  <stop offset="5%" stopColor="var(--color-proposalWinRatePct)" stopOpacity={0.18} />
                   <stop offset="100%" stopColor="var(--color-proposalWinRatePct)" stopOpacity={0.03} />
                 </linearGradient>
               </defs>
               <CartesianGrid vertical={false} strokeDasharray="4 6" />
               <XAxis
-                xAxisId="bars"
                 dataKey="label"
                 tickLine={false}
                 axisLine={false}
                 tickMargin={10}
                 minTickGap={tickGap}
-                padding={throughputXAxisPadding}
-                scale={throughputXAxisScale}
+                padding={xAxisPadding}
               />
-              {isShortRange ? (
-                <XAxis
-                  xAxisId="edge"
-                  dataKey="rangePosition"
-                  type="number"
-                  domain={[0, 1]}
-                  hide
-                />
-              ) : null}
               {view === "throughput" ? (
                 <>
                   <YAxis
@@ -2463,7 +3237,6 @@ function DeliveryVolumeCard({
                     width={52}
                     domain={[0, winRateAxisMax]}
                     tickFormatter={(value) => `${value}%`}
-                    hide={useTwoPointThroughputBars}
                   />
                 </>
               ) : view === "win-rate" ? (
@@ -2483,12 +3256,33 @@ function DeliveryVolumeCard({
                   allowDecimals={false}
                 />
               )}
-              {view === "win-rate" || (view === "throughput" && !useTwoPointThroughputBars) ? (
-                <ReferenceLine y={25} stroke="var(--border)" strokeDasharray="4 6" />
+              <ReferenceLine
+                yAxisId={view === "throughput" ? "right" : undefined}
+                y={25}
+                stroke="var(--border)"
+                strokeDasharray="4 6"
+              />
+              {predictionMode !== "off" ? (
+                <PredictionRegion timeline={chartTimeline} />
+              ) : null}
+              {predictionMode !== "off" && latestActualPoint ? (
+                <ReferenceLine
+                  x={latestActualPoint.label}
+                  stroke="var(--border)"
+                  strokeDasharray="2 6"
+                />
               ) : null}
               <ChartTooltip
                 content={({ active, label, payload }) => {
-                  if (!active || !payload?.length) {
+                  const filteredPayload = (payload ?? []).filter((item) => {
+                    if (item.value == null) {
+                      return false;
+                    }
+
+                    return typeof item.value !== "number" || Number.isFinite(item.value);
+                  });
+
+                  if (!active || !filteredPayload.length) {
                     return null;
                   }
 
@@ -2502,18 +3296,39 @@ function DeliveryVolumeCard({
                           proposalWinRatePct: 2,
                         } as const;
 
-                        return order[String(item.dataKey) as keyof typeof order] ?? 99;
+                        return (
+                          order[
+                            normalizePredictionSeriesKey(String(item.dataKey)) as keyof typeof order
+                          ] ?? 99
+                        );
                       }}
-                      label={payload[0]?.payload?.label ?? label}
-                      payload={payload}
-                      labelFormatter={(tooltipLabel) => `Week ending ${tooltipLabel}`}
-                      formatter={(value, name) => {
-                        const key = String(name);
+                      label={filteredPayload[0]?.payload?.label ?? label}
+                      payload={filteredPayload}
+                      labelFormatter={(tooltipLabel, items) =>
+                        formatPredictionTooltipLabel(
+                          String(tooltipLabel),
+                          items as ReadonlyArray<{
+                            payload?: {
+                              isForesight?: boolean;
+                              predictionDaysAhead?: number;
+                            };
+                          }>,
+                        )
+                      }
+                      formatter={(value, name, item, _index, point) => {
+                        const key = normalizePredictionSeriesKey(
+                          String(item.dataKey ?? name),
+                        );
+                        const pointData =
+                          point as unknown as DeliveryVolumeChartPoint | undefined;
+                        const isPredictionPoint = Boolean(pointData?.isForesight);
 
                         return (
                           <div className="flex flex-1 items-center justify-between gap-3">
                             <span className="text-muted-foreground">
-                              {deliveryTooltipLabelMap[key]}
+                              {isPredictionPoint
+                                ? `${deliveryTooltipLabelMap[key] ?? key} estimate`
+                                : deliveryTooltipLabelMap[key] ?? key}
                             </span>
                             <span className="font-mono font-medium text-foreground">
                               {key === "proposalWinRatePct"
@@ -2533,100 +3348,127 @@ function DeliveryVolumeCard({
               />
               {view === "throughput" ? (
                 <>
-                  <Bar
-                    xAxisId="bars"
+                  <Area
                     yAxisId="left"
                     dataKey="proposalsSent"
+                    type={curveType}
+                    stroke="var(--color-proposalsSent)"
                     fill="url(#proposalsFill)"
-                    radius={isShortRange ? [12, 12, 0, 0] : [10, 10, 0, 0]}
-                    maxBarSize={getAdaptiveBarSize(timeline, 30)}
-                    minPointSize={getAdaptiveMinPointSize(timeline)}
-                    label={
-                      useTwoPointThroughputBars
-                        ? (props) =>
-                            renderBarValueLabel(
-                              props,
-                              (value) => formatMetricByKey("proposalsSent", value),
-                              "var(--color-proposalsSent)",
-                            )
-                        : false
-                    }
+                    strokeWidth={getAdaptiveLineStrokeWidth(chartTimeline, 2.35)}
+                    dot={proposalsDot}
+                    activeDot={{
+                      r: 4.5,
+                      fill: "var(--color-proposalsSent)",
+                      stroke: "var(--background)",
+                      strokeWidth: 2,
+                    }}
                     {...getSeriesAnimationProps(0)}
                   />
-                  <Bar
-                    xAxisId="bars"
+                  <Line
                     yAxisId="left"
                     dataKey="ordersWon"
-                    fill="url(#ordersFill)"
-                    radius={isShortRange ? [12, 12, 0, 0] : [10, 10, 0, 0]}
-                    maxBarSize={getAdaptiveBarSize(timeline, 22)}
-                    minPointSize={getAdaptiveMinPointSize(timeline)}
-                    label={
-                      useTwoPointThroughputBars
-                        ? (props) =>
-                            renderBarValueLabel(
-                              props,
-                              (value) => formatMetricByKey("ordersWon", value),
-                              "var(--color-ordersWon)",
-                            )
-                        : false
-                    }
+                    type={curveType}
+                    stroke="var(--color-ordersWon)"
+                    strokeWidth={getAdaptiveLineStrokeWidth(chartTimeline, 2.75)}
+                    dot={ordersDot}
+                    activeDot={{
+                      r: 4.5,
+                      fill: "var(--color-ordersWon)",
+                      stroke: "var(--background)",
+                      strokeWidth: 2,
+                    }}
                     {...getSeriesAnimationProps(1)}
                   />
-                  {useTwoPointThroughputBars ? (
-                    <Bar
-                      xAxisId="bars"
-                      yAxisId="right"
-                      dataKey="proposalWinRatePct"
-                      fill="url(#winRateFill)"
-                      radius={isShortRange ? [12, 12, 0, 0] : [10, 10, 0, 0]}
-                      maxBarSize={getAdaptiveBarSize(timeline, 16)}
-                      minPointSize={getAdaptiveMinPointSize(timeline)}
-                      label={(props) =>
-                        renderBarValueLabel(
-                          props,
-                          (value) => formatMetricValue(value, "percent"),
-                          "var(--color-proposalWinRatePct)",
-                        )
-                      }
-                      {...getSeriesAnimationProps(2)}
-                    />
-                  ) : (
-                    <Line
-                      xAxisId={throughputTrendXAxisId}
-                      yAxisId="right"
-                      dataKey="proposalWinRatePct"
-                      type={curveType}
-                      stroke="var(--color-proposalWinRatePct)"
-                      strokeWidth={getAdaptiveLineStrokeWidth(timeline, 3)}
-                      dot={proposalWinRateDot}
-                      activeDot={{
-                        r: 4.5,
-                        fill: "var(--color-proposalWinRatePct)",
-                        stroke: "var(--background)",
-                        strokeWidth: 2,
-                      }}
-                      {...getSeriesAnimationProps(2)}
-                    />
-                  )}
+                  <Line
+                    yAxisId="right"
+                    dataKey="proposalWinRatePct"
+                    type={curveType}
+                    stroke="var(--color-proposalWinRatePct)"
+                    strokeOpacity={0.82}
+                    strokeWidth={getAdaptiveLineStrokeWidth(chartTimeline, 2.4)}
+                    dot={proposalWinRateDot}
+                    activeDot={{
+                      r: 4.5,
+                      fill: "var(--color-proposalWinRatePct)",
+                      stroke: "var(--background)",
+                      strokeWidth: 2,
+                    }}
+                    {...getSeriesAnimationProps(2)}
+                  />
                 </>
               ) : null}
               {view === "win-rate" ? (
                 <Area
-                  xAxisId={throughputTrendXAxisId}
                   dataKey="proposalWinRatePct"
                   type={curveType}
                   stroke="var(--color-proposalWinRatePct)"
                   fill="url(#winRateFill)"
-                  strokeWidth={getAdaptiveLineStrokeWidth(timeline, 2.75)}
+                  strokeWidth={getAdaptiveLineStrokeWidth(chartTimeline, 2.75)}
                   dot={proposalWinRateDot}
                   activeDot={{
-                    r: 4,
-                    fill: "var(--color-proposalWinRatePct)",
-                    stroke: "var(--background)",
-                    strokeWidth: 2,
+                      r: 4,
+                      fill: "var(--color-proposalWinRatePct)",
+                      stroke: "var(--background)",
+                      strokeWidth: 2,
                   }}
                   {...getSeriesAnimationProps(0)}
+                />
+              ) : null}
+              {predictionMode !== "off" && view === "throughput" ? (
+                <>
+                  <PredictionArea
+                    dataKey={getPredictionAreaDataKey("proposalsSent")}
+                    yAxisId="left"
+                    fill="var(--color-proposalsSent)"
+                    fillOpacity={0.12}
+                    animationIndex={3}
+                  />
+                  <ForesightLine
+                    metricKey="proposalsSent"
+                    yAxisId="left"
+                    stroke="var(--color-proposalsSent)"
+                    strokeWidth={getAdaptiveLineStrokeWidth(chartTimeline, 2.2)}
+                    animationIndex={4}
+                  />
+                  <ForesightLine
+                    metricKey="ordersWon"
+                    yAxisId="left"
+                    stroke="var(--color-ordersWon)"
+                    strokeWidth={getAdaptiveLineStrokeWidth(chartTimeline, 2.5)}
+                    animationIndex={5}
+                  />
+                  <PredictionArea
+                    dataKey={getPredictionAreaDataKey("proposalWinRatePct")}
+                    yAxisId="right"
+                    fill="var(--color-proposalWinRatePct)"
+                    fillOpacity={0.08}
+                    animationIndex={6}
+                  />
+                  <PredictionLine
+                    dataKey="proposalWinRatePctForesight"
+                    name="proposalWinRatePct"
+                    yAxisId="right"
+                    stroke="var(--color-proposalWinRatePct)"
+                    strokeWidth={getAdaptiveLineStrokeWidth(chartTimeline, 2.2)}
+                    animationIndex={7}
+                  />
+                </>
+              ) : null}
+              {predictionMode !== "off" && view === "win-rate" ? (
+                <PredictionArea
+                  dataKey={getPredictionAreaDataKey("proposalWinRatePct")}
+                  fill="var(--color-proposalWinRatePct)"
+                  fillOpacity={0.1}
+                  animationIndex={2}
+                />
+              ) : null}
+              {predictionMode !== "off" && view === "win-rate" ? (
+                <PredictionLine
+                  dataKey="proposalWinRatePctForesight"
+                  name="proposalWinRatePct"
+                  stroke="var(--color-proposalWinRatePct)"
+                  strokeWidth={getAdaptiveLineStrokeWidth(chartTimeline, 2.35)}
+                  animationIndex={3}
                 />
               ) : null}
             </ComposedChart>
@@ -2639,46 +3481,87 @@ function DeliveryVolumeCard({
 
 function DeliveryReliabilityCard({
   timeline,
+  predictionMode = "off",
 }: {
   timeline: DashboardData["timeline"];
+  predictionMode?: PredictionMode;
 }) {
   const [view, setView] = React.useState<"combined" | "sla" | "incidents">(
     "combined",
   );
-  const reliabilityTimeline = React.useMemo(
+  const chartTimeline = React.useMemo(
     () =>
-      timeline.map((point, index) => ({
-        ...point,
-        rangePosition:
-          timeline.length > 1 ? index / (timeline.length - 1) : 0,
-      })),
-    [timeline],
+      predictionMode !== "off"
+        ? buildPredictionChartTimeline(
+            timeline,
+            ["feedSlaQualityScore", "incidentCount"],
+            predictionMode,
+          )
+        : (timeline as ForesightChartPoint[]),
+    [predictionMode, timeline],
   );
   const latestPoint = timeline.at(-1);
   const baselinePoint = timeline.length > 1 ? timeline[0] ?? null : null;
-  const tickGap = getAdaptiveTickGap(timeline);
-  const isShortRange = isShortRangeTimeline(timeline);
-  const xAxisPadding = getAdaptiveXAxisPadding(timeline);
+  const latestActualPoint =
+    [...chartTimeline].reverse().find((point) => !point.isForesight) ??
+    chartTimeline.at(-1) ??
+    null;
+  const tickGap = getAdaptiveTickGap(chartTimeline);
+  const xAxisPadding = getAdaptiveXAxisPadding(chartTimeline);
   const showSla = view !== "incidents";
   const showIncidents = view !== "sla";
-  const reliabilityXAxisPadding =
-    showIncidents && isShortRange ? { left: 20, right: 20 } : xAxisPadding;
-  const reliabilityXAxisScale = showIncidents ? undefined : isShortRange ? "point" : undefined;
-  const reliabilityTrendXAxisId = isShortRange ? "edge" : "bars";
-  const useTwoPointCombinedBars = isShortRange && view === "combined";
-  const curveType = getAdaptiveCurveType(timeline);
+  const curveType = getAdaptiveCurveType(chartTimeline);
   const slaDot = getAdaptiveLineDot(
     "var(--color-feedSlaQualityScore)",
-    reliabilityTimeline,
+    chartTimeline,
   );
-  const incidentAxisMax = getMetricUpperBound(
-    timeline,
-    ["incidentCount"],
-    { minimum: 2, padding: 1, roundTo: 1 },
+  const incidentDot = getAdaptiveLineDot(
+    "var(--color-incidentCount)",
+    chartTimeline,
   );
+  const slaAxisDomain = React.useMemo(() => {
+    const values = chartTimeline.flatMap((point) => [
+      Number(point.feedSlaQualityScore ?? NaN),
+      Number(point.feedSlaQualityScoreForesight ?? NaN),
+    ]).filter(Number.isFinite);
+
+    if (!values.length) {
+      return [95, 100] as const;
+    }
+
+    const minValue = Math.min(...values);
+    const maxValue = Math.max(...values);
+    const upperBound = Math.min(
+      100,
+      Math.max(98, Math.ceil((maxValue + 0.4) * 2) / 2),
+    );
+    const lowerBound = Math.max(
+      90,
+      Math.min(
+        99,
+        Math.floor((minValue - 0.6) * 2) / 2,
+        upperBound - 2,
+      ),
+    );
+
+    return [lowerBound, upperBound] as const;
+  }, [chartTimeline]);
+  const incidentAxisMax = React.useMemo(() => {
+    const maxValue = chartTimeline.reduce(
+      (currentMax, point) =>
+        Math.max(
+          currentMax,
+          Number(point.incidentCount ?? 0),
+          Number(point.incidentCountForesight ?? 0),
+        ),
+      0,
+    );
+
+    return Math.max(2, Math.ceil(maxValue + 1));
+  }, [chartTimeline]);
   const chartAnimationKey = getTimelineAnimationKey(
-    reliabilityTimeline,
-    `${view}-${useTwoPointCombinedBars ? "bars" : "mixed"}`,
+    chartTimeline,
+    `delivery-reliability-${view}-${predictionMode}`,
   );
 
   return (
@@ -2729,51 +3612,30 @@ function DeliveryReliabilityCard({
             config={deliveryReliabilityConfig}
             className="h-[312px] w-full animate-chart-load"
           >
-            <ComposedChart
-              accessibilityLayer
-              data={reliabilityTimeline}
-              margin={defaultChartMargin}
-              barCategoryGap={isShortRange ? "18%" : "24%"}
-            >
-            <defs>
-              <linearGradient id="slaFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-feedSlaQualityScore)" stopOpacity={0.24} />
-                <stop offset="100%" stopColor="var(--color-feedSlaQualityScore)" stopOpacity={0.02} />
-              </linearGradient>
-              <linearGradient id="incidentFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-incidentCount)" stopOpacity={0.95} />
-                <stop offset="100%" stopColor="var(--color-incidentCount)" stopOpacity={0.4} />
-              </linearGradient>
-            </defs>
+            <ComposedChart accessibilityLayer data={chartTimeline} margin={defaultChartMargin}>
+              <defs>
+                <linearGradient id="slaFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--color-feedSlaQualityScore)" stopOpacity={0.24} />
+                  <stop offset="100%" stopColor="var(--color-feedSlaQualityScore)" stopOpacity={0.03} />
+                </linearGradient>
+              </defs>
               <CartesianGrid vertical={false} strokeDasharray="4 6" />
               <XAxis
-                xAxisId="bars"
                 dataKey="label"
                 tickLine={false}
                 axisLine={false}
                 tickMargin={10}
                 minTickGap={tickGap}
-                padding={reliabilityXAxisPadding}
-                scale={reliabilityXAxisScale}
+                padding={xAxisPadding}
               />
-              {isShortRange ? (
-                <XAxis
-                  xAxisId="edge"
-                  dataKey="rangePosition"
-                  type="number"
-                  domain={[0, 1]}
-                  hide
-                />
-              ) : null}
               {showSla ? (
                 <YAxis
                   yAxisId="left"
                   tickLine={false}
                   axisLine={false}
                   width={48}
-                  domain={[95, 100]}
+                  domain={slaAxisDomain}
                   tickFormatter={(value) => `${value}%`}
-                  hide={useTwoPointCombinedBars}
                 />
               ) : null}
               {showIncidents ? (
@@ -2785,10 +3647,9 @@ function DeliveryReliabilityCard({
                   width={40}
                   domain={[0, incidentAxisMax]}
                   allowDecimals={false}
-                  hide={useTwoPointCombinedBars}
                 />
               ) : null}
-              {showSla && !useTwoPointCombinedBars ? (
+              {showSla ? (
                 <ReferenceLine
                   yAxisId="left"
                   y={99}
@@ -2796,98 +3657,170 @@ function DeliveryReliabilityCard({
                   strokeDasharray="4 6"
                 />
               ) : null}
-            <ChartTooltip
-              content={({ active, label, payload }) => {
-                if (!active || !payload?.length) {
-                  return null;
-                }
+              {predictionMode !== "off" ? (
+                <PredictionRegion timeline={chartTimeline} />
+              ) : null}
+              {predictionMode !== "off" && latestActualPoint ? (
+                <ReferenceLine
+                  x={latestActualPoint.label}
+                  stroke="var(--border)"
+                  strokeDasharray="2 6"
+                />
+              ) : null}
+              <ChartTooltip
+                content={({ active, label, payload }) => {
+                  const filteredPayload = (payload ?? []).filter((item) => {
+                    if (item.value == null) {
+                      return false;
+                    }
 
-                return (
-                  <ChartTooltipContent
-                    active={active}
-                    label={payload[0]?.payload?.label ?? label}
-                    payload={payload}
-                    labelFormatter={(tooltipLabel) => `Week ending ${tooltipLabel}`}
-                    formatter={(value, name) => (
-                      <div className="flex flex-1 items-center justify-between gap-3">
-                        <span className="text-muted-foreground">
-                          {deliveryReliabilityConfig[String(name) as keyof typeof deliveryReliabilityConfig]?.label}
-                        </span>
-                        <span className="font-mono font-medium text-foreground">
-                          {formatMetricByKey(
-                            String(name) as NumericMetricKey,
-                            Number(value),
-                          )}
-                        </span>
-                      </div>
-                    )}
-                  />
-                );
-              }}
-            />
+                    return typeof item.value !== "number" || Number.isFinite(item.value);
+                  });
+
+                  if (!active || !filteredPayload.length) {
+                    return null;
+                  }
+
+                  return (
+                    <ChartTooltipContent
+                      active={active}
+                      label={filteredPayload[0]?.payload?.label ?? label}
+                      payload={filteredPayload}
+                      itemSorter={(item) => {
+                        const order = {
+                          feedSlaQualityScore: 0,
+                          incidentCount: 1,
+                        } as const;
+
+                        return (
+                          order[
+                            normalizePredictionMetricKey(
+                              String(item.dataKey ?? item.name),
+                            ) as keyof typeof order
+                          ] ?? 99
+                        );
+                      }}
+                      labelFormatter={(tooltipLabel, items) =>
+                        formatPredictionTooltipLabel(
+                          String(tooltipLabel),
+                          items as ReadonlyArray<{
+                            payload?: {
+                              isForesight?: boolean;
+                              predictionDaysAhead?: number;
+                            };
+                          }>,
+                        )
+                      }
+                      formatter={(value, name, item, _index, point) => {
+                        const metricKey = normalizePredictionMetricKey(
+                          String(item.dataKey ?? name),
+                        );
+                        const pointData =
+                          point as unknown as ForesightChartPoint | undefined;
+                        const isPredictionPoint = Boolean(pointData?.isForesight);
+                        const labelMap: Record<NumericMetricKey, string> = {
+                          feedSlaQualityScore: "Feed SLA",
+                          incidentCount: "Incident count",
+                          proposalsSent: "Proposals sent",
+                          ordersWon: "Orders won",
+                          pipelineValue: "Pipeline value",
+                          pipelineVelocity: "Pipeline velocity",
+                          closeRatePct: "Close rate",
+                          netRevenueRetentionPct: "NRR",
+                          newCustomersPerMonth: "New customers",
+                          pipelineCoverageRatio: "Coverage ratio",
+                          averageDealSize: "Avg deal size",
+                          customerAcquisitionCost: "CAC",
+                          marketingSourcedPipelineCount: "Marketing-sourced #",
+                          feedRetentionPct: "Feed retention",
+                          grossRevenueRetentionPct: "GRR",
+                          marketingSourcedPipelinePct: "Marketing-sourced pipeline",
+                          leadToOpportunityConversionPct: "Lead to opportunity",
+                          salesCycleDays: "Sales cycle",
+                          cacPaybackMonths: "CAC payback",
+                        };
+
+                        return (
+                          <div className="flex flex-1 items-center justify-between gap-3">
+                            <span className="text-muted-foreground">
+                              {isPredictionPoint
+                                ? `${labelMap[metricKey]} estimate`
+                                : labelMap[metricKey]}
+                            </span>
+                            <span className="font-mono font-medium text-foreground">
+                              {formatMetricByKey(metricKey, Number(value))}
+                            </span>
+                          </div>
+                        );
+                      }}
+                    />
+                  );
+                }}
+              />
               <ChartLegend
                 verticalAlign="top"
                 content={<ChartLegendContent className="justify-start" />}
               />
               {showSla ? (
-                useTwoPointCombinedBars ? (
-                  <Bar
-                    xAxisId="bars"
-                    yAxisId="left"
-                    dataKey="feedSlaQualityScore"
-                    fill="url(#slaFill)"
-                    radius={[10, 10, 0, 0]}
-                    maxBarSize={getAdaptiveBarSize(timeline, 18)}
-                    minPointSize={getAdaptiveMinPointSize(timeline)}
-                    label={(props) =>
-                      renderBarValueLabel(
-                        props,
-                        (value) => formatMetricValue(value, "percent"),
-                        "var(--color-feedSlaQualityScore)",
-                      )
-                    }
-                    {...getSeriesAnimationProps(0)}
-                  />
-                ) : (
-                  <Area
-                    xAxisId={reliabilityTrendXAxisId}
-                    yAxisId="left"
-                    dataKey="feedSlaQualityScore"
-                    type={curveType}
-                    stroke="var(--color-feedSlaQualityScore)"
-                    fill="url(#slaFill)"
-                    strokeWidth={getAdaptiveLineStrokeWidth(timeline, 2.5)}
-                    dot={slaDot}
-                    activeDot={{
-                      r: 4,
-                      fill: "var(--color-feedSlaQualityScore)",
-                      stroke: "var(--background)",
-                      strokeWidth: 2,
-                    }}
-                    {...getSeriesAnimationProps(0)}
-                  />
-                )
+                <Area
+                  yAxisId="left"
+                  dataKey="feedSlaQualityScore"
+                  type={curveType}
+                  stroke="var(--color-feedSlaQualityScore)"
+                  fill="url(#slaFill)"
+                  strokeWidth={getAdaptiveLineStrokeWidth(chartTimeline, 2.5)}
+                  dot={slaDot}
+                  activeDot={{
+                    r: 4,
+                    fill: "var(--color-feedSlaQualityScore)",
+                    stroke: "var(--background)",
+                    strokeWidth: 2,
+                  }}
+                  {...getSeriesAnimationProps(0)}
+                />
               ) : null}
               {showIncidents ? (
-                <Bar
-                  xAxisId="bars"
+                <Line
                   yAxisId="right"
                   dataKey="incidentCount"
-                  fill="url(#incidentFill)"
-                  radius={isShortRange ? [10, 10, 0, 0] : [8, 8, 0, 0]}
-                  maxBarSize={getAdaptiveBarSize(timeline, 26)}
-                  minPointSize={getAdaptiveMinPointSize(timeline)}
-                  label={
-                    useTwoPointCombinedBars
-                      ? (props) =>
-                          renderBarValueLabel(
-                            props,
-                            (value) => formatMetricByKey("incidentCount", value),
-                            "var(--color-incidentCount)",
-                          )
-                      : false
-                  }
+                  type="linear"
+                  stroke="var(--color-incidentCount)"
+                  strokeWidth={getAdaptiveLineStrokeWidth(chartTimeline, 2.65)}
+                  dot={incidentDot}
+                  activeDot={{
+                    r: 4,
+                    fill: "var(--color-incidentCount)",
+                    stroke: "var(--background)",
+                    strokeWidth: 2,
+                  }}
                   {...getSeriesAnimationProps(1)}
+                />
+              ) : null}
+              {predictionMode !== "off" && showSla ? (
+                <PredictionArea
+                  dataKey={getPredictionAreaDataKey("feedSlaQualityScore")}
+                  yAxisId="left"
+                  fill="var(--color-feedSlaQualityScore)"
+                  fillOpacity={0.1}
+                  animationIndex={2}
+                />
+              ) : null}
+              {predictionMode !== "off" && showSla ? (
+                <ForesightLine
+                  metricKey="feedSlaQualityScore"
+                  yAxisId="left"
+                  stroke="var(--color-feedSlaQualityScore)"
+                  strokeWidth={getAdaptiveLineStrokeWidth(chartTimeline, 2.2)}
+                  animationIndex={3}
+                />
+              ) : null}
+              {predictionMode !== "off" && showIncidents ? (
+                <ForesightLine
+                  metricKey="incidentCount"
+                  yAxisId="right"
+                  stroke="var(--color-incidentCount)"
+                  strokeWidth={getAdaptiveLineStrokeWidth(chartTimeline, 2.35)}
+                  animationIndex={4}
                 />
               ) : null}
             </ComposedChart>

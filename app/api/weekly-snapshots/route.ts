@@ -1,9 +1,31 @@
 import { NextResponse } from "next/server";
 
-import { upsertWeeklySnapshot } from "@/lib/dashboard-store";
-import { weeklySnapshotPayloadSchema } from "@/lib/kpi-dashboard";
+import { buildDashboardForecast } from "@/lib/dashboard-forecast";
+import { readWeeklySnapshots, upsertWeeklySnapshot } from "@/lib/dashboard-store";
+import { buildDashboardData, weeklySnapshotPayloadSchema } from "@/lib/kpi-dashboard";
 
 export const dynamic = "force-dynamic";
+
+export async function GET() {
+  try {
+    const snapshots = await readWeeklySnapshots();
+    return NextResponse.json({
+      snapshots,
+      dashboard: buildDashboardData(snapshots),
+      forecast: buildDashboardForecast(snapshots),
+    });
+  } catch (error) {
+    console.error("Failed to load weekly snapshots", error);
+
+    return NextResponse.json(
+      {
+        message:
+          "The weekly snapshot timeline could not be loaded. Please try again in a moment.",
+      },
+      { status: 500 },
+    );
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -32,9 +54,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const snapshot = await upsertWeeklySnapshot(parsedPayload.data);
+    const result = await upsertWeeklySnapshot(parsedPayload.data);
 
-    return NextResponse.json({ snapshot });
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Failed to upsert weekly snapshot", error);
 

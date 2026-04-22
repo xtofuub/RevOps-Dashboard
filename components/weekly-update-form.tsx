@@ -12,6 +12,7 @@ import { toast } from "sonner";
 
 import {
   KPI_FORM_SECTIONS,
+  calculatePipelineVelocity,
   NUMERIC_FIELD_DEFINITIONS,
   formatMetricByKey,
   formatWeekLabelWithYear,
@@ -78,9 +79,50 @@ const blankNumericState = Object.fromEntries(
   NUMERIC_FIELD_DEFINITIONS.map((field) => [field.key, ""]),
 ) as Record<NumericMetricKey, string>;
 
+function parseOptionalNumberInput(value: string) {
+  const parsedValue = Number(value.trim());
+  return Number.isFinite(parsedValue) ? parsedValue : null;
+}
+
+function syncDerivedMetrics(
+  formState: WeeklyFormState,
+  snapshots: WeeklySnapshot[],
+): WeeklyFormState {
+  const pipelineValue = parseOptionalNumberInput(formState.pipelineValue);
+  const salesCycleDays = parseOptionalNumberInput(formState.salesCycleDays);
+  const closeRatePct = parseOptionalNumberInput(formState.closeRatePct);
+
+  if (
+    pipelineValue === null ||
+    salesCycleDays === null ||
+    closeRatePct === null ||
+    salesCycleDays <= 0
+  ) {
+    return {
+      ...formState,
+      pipelineVelocity: "",
+    };
+  }
+
+  return {
+    ...formState,
+    pipelineVelocity: String(
+      calculatePipelineVelocity(
+        {
+          pipelineValue,
+          salesCycleDays,
+          closeRatePct,
+        },
+        snapshots,
+      ),
+    ),
+  };
+}
+
 function buildFormState(
   snapshot: WeeklySnapshot | null,
   weekOf: string,
+  snapshots: WeeklySnapshot[],
 ): WeeklyFormState {
   const stageMetrics = normalizeStageMetrics(snapshot?.stageMetrics ?? []).map(
     (metric) => ({
@@ -92,22 +134,25 @@ function buildFormState(
     }),
   );
 
-  return {
-    ...blankNumericState,
-    ...(snapshot
-      ? Object.fromEntries(
-          NUMERIC_FIELD_DEFINITIONS.map((field) => [
-            field.key,
-            String(snapshot[field.key]),
-          ]),
-        )
-      : {}),
-    weekOf,
-    lossReasonsTop3:
-      snapshot?.lossReasonsTop3.slice(0, 3) ?? ["", "", ""],
-    repeatedRequestsText: snapshot?.repeatedRequests.join("\n") ?? "",
-    stageMetrics,
-  };
+  return syncDerivedMetrics(
+    {
+      ...blankNumericState,
+      ...(snapshot
+        ? Object.fromEntries(
+            NUMERIC_FIELD_DEFINITIONS.map((field) => [
+              field.key,
+              String(snapshot[field.key]),
+            ]),
+          )
+        : {}),
+      weekOf,
+      lossReasonsTop3:
+        snapshot?.lossReasonsTop3.slice(0, 3) ?? ["", "", ""],
+      repeatedRequestsText: snapshot?.repeatedRequests.join("\n") ?? "",
+      stageMetrics,
+    },
+    snapshots,
+  );
 }
 
 function parseNumberInput(value: string) {
@@ -121,14 +166,27 @@ function extractLines(value: string) {
     .filter(Boolean);
 }
 
-function toPayload(formState: WeeklyFormState): WeeklySnapshotPayload {
+function toPayload(
+  formState: WeeklyFormState,
+  snapshots: WeeklySnapshot[],
+): WeeklySnapshotPayload {
+  const numericValues = Object.fromEntries(
+    NUMERIC_FIELD_DEFINITIONS.map((field) => [
+      field.key,
+      parseNumberInput(formState[field.key]),
+    ]),
+  ) as Record<NumericMetricKey, number>;
+
   return {
     weekOf: formState.weekOf,
-    ...Object.fromEntries(
-      NUMERIC_FIELD_DEFINITIONS.map((field) => [
-        field.key,
-        parseNumberInput(formState[field.key]),
-      ]),
+    ...numericValues,
+    pipelineVelocity: calculatePipelineVelocity(
+      {
+        pipelineValue: numericValues.pipelineValue,
+        salesCycleDays: numericValues.salesCycleDays,
+        closeRatePct: numericValues.closeRatePct,
+      },
+      snapshots,
     ),
     lossReasonsTop3: formState.lossReasonsTop3.map((reason) => reason.trim()),
     repeatedRequests: extractLines(formState.repeatedRequestsText),
@@ -162,24 +220,29 @@ export function WeeklyUpdateForm({
     {},
   );
   const [formState, setFormState] = React.useState<WeeklyFormState>(() =>
-    buildFormState(latestSnapshot, suggestedWeekOf),
+    buildFormState(latestSnapshot, suggestedWeekOf, snapshots),
   );
 
   React.useEffect(() => {
     setTemplateSelection("this-week-friday");
     setFieldErrors({});
-    setFormState(buildFormState(latestSnapshot, suggestedWeekOf));
-  }, [latestSnapshot, suggestedWeekOf]);
+    setFormState(buildFormState(latestSnapshot, suggestedWeekOf, snapshots));
+  }, [latestSnapshot, snapshots, suggestedWeekOf]);
 
   const currentStoredSnapshot =
     snapshots.find((snapshot) => snapshot.weekOf === formState.weekOf) ?? null;
   const isSaving = isSubmitting || isRefreshing;
 
   function updateNumericField(key: NumericMetricKey, value: string) {
-    setFormState((currentState) => ({
-      ...currentState,
-      [key]: value,
-    }));
+    setFormState((currentState) =>
+      syncDerivedMetrics(
+        {
+          ...currentState,
+          [key]: value,
+        },
+        snapshots,
+      ),
+    );
   }
 
   function updateLossReason(index: number, value: string) {
@@ -209,14 +272,14 @@ export function WeeklyUpdateForm({
     setFieldErrors({});
 
     if (selection === "this-week-friday") {
-      setFormState(buildFormState(latestSnapshot, suggestedWeekOf));
+      setFormState(buildFormState(latestSnapshot, suggestedWeekOf, snapshots));
       return;
     }
 
     const selectedSnapshot =
       snapshots.find((snapshot) => snapshot.weekOf === selection) ?? null;
 
-    setFormState(buildFormState(selectedSnapshot, selection));
+    setFormState(buildFormState(selectedSnapshot, selection, snapshots));
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -230,7 +293,7 @@ export function WeeklyUpdateForm({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(toPayload(formState)),
+        body: JSON.stringify(toPayload(formState, snapshots)),
       });
 
       const body = await response.json();
@@ -268,13 +331,13 @@ export function WeeklyUpdateForm({
             <CardTitle>Weekly update</CardTitle>
             <CardDescription>
               Push the full KPI snapshot for one Friday week-ending reporting
-              date.
-              Saving the same week again safely overwrites the existing record.
+              date. Saving the same week again creates a new revision so the
+              prior version stays in history.
             </CardDescription>
           </div>
           <Badge variant="outline">
             <CalendarDaysIcon data-icon="inline-start" />
-            Friday-based upsert
+            Friday-based history
           </Badge>
         </div>
         <Alert>
@@ -286,12 +349,12 @@ export function WeeklyUpdateForm({
           </AlertTitle>
           <AlertDescription>
             {currentStoredSnapshot
-              ? "Saving now will replace the stored values for this exact reporting week."
+              ? "Saving now will create a fresh revision for this reporting week while keeping earlier saved versions available."
               : "Saving now will append a new weekly snapshot to the local dashboard history."}
           </AlertDescription>
           <AlertAction>
             <Badge variant="outline">
-              {currentStoredSnapshot ? "Overwrite" : "Create"}
+              {currentStoredSnapshot ? "New revision" : "Create"}
             </Badge>
           </AlertAction>
         </Alert>
@@ -393,6 +456,7 @@ export function WeeklyUpdateForm({
                     <Field
                       key={field.key}
                       data-invalid={Boolean(fieldErrors[field.key])}
+                      data-disabled={field.key === "pipelineVelocity"}
                     >
                       <FieldLabel htmlFor={field.key}>{field.label}</FieldLabel>
                       <FieldContent>
@@ -404,12 +468,17 @@ export function WeeklyUpdateForm({
                           max={field.max}
                           step={field.step}
                           value={formState[field.key]}
+                          disabled={field.key === "pipelineVelocity"}
                           aria-invalid={Boolean(fieldErrors[field.key])}
                           onChange={(event) =>
                             updateNumericField(field.key, event.target.value)
                           }
                         />
-                        <FieldDescription>{field.description}</FieldDescription>
+                        <FieldDescription>
+                          {field.key === "pipelineVelocity"
+                            ? "Calculated automatically from saved history using pipeline value, close rate, and sales cycle."
+                            : field.description}
+                        </FieldDescription>
                         <FieldError>{fieldErrors[field.key]}</FieldError>
                       </FieldContent>
                     </Field>
@@ -591,8 +660,8 @@ export function WeeklyUpdateForm({
 
         <CardFooter className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 bg-muted/20">
           <div className="text-sm text-muted-foreground">
-            Values are validated on save and stored in the local weekly history
-            file.
+            Values are validated on save and stored in durable weekly history
+            with immutable revisions.
           </div>
           <Button type="submit" disabled={isSaving}>
             <SaveIcon data-icon="inline-start" />

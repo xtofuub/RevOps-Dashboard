@@ -1,84 +1,38 @@
 import "server-only";
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
-
 import {
-  normalizeStageMetrics,
-  sortSnapshots,
-  weeklySnapshotPayloadSchema,
-  weeklySnapshotSchema,
-  weeklySnapshotsSchema,
-  type WeeklySnapshot,
+  createSnapshotRevision,
+  listAlertSubscriptions,
+  listMetricTargets,
+  listSnapshotRevisions,
+  listWeeklySnapshots,
+} from "@/lib/dashboard-db";
+import {
+  calculatePipelineVelocity,
   type WeeklySnapshotPayload,
 } from "@/lib/kpi-dashboard";
 
-const dashboardDataFilePath = path.join(
-  process.cwd(),
-  "data",
-  "weekly-metrics.json",
-);
-
 export async function readWeeklySnapshots() {
-  try {
-    const fileContents = await readFile(dashboardDataFilePath, "utf8");
-
-    if (!fileContents.trim()) {
-      return [] as WeeklySnapshot[];
-    }
-
-    const parsed = weeklySnapshotsSchema.parse(JSON.parse(fileContents));
-
-    return sortSnapshots(parsed).map((snapshot) => ({
-      ...snapshot,
-      stageMetrics: normalizeStageMetrics(snapshot.stageMetrics),
-    }));
-  } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === "ENOENT"
-    ) {
-      return [] as WeeklySnapshot[];
-    }
-
-    throw error;
-  }
+  return listWeeklySnapshots();
 }
 
 export async function upsertWeeklySnapshot(payload: WeeklySnapshotPayload) {
-  const safePayload = weeklySnapshotPayloadSchema.parse({
+  const history = listWeeklySnapshots();
+
+  return createSnapshotRevision({
     ...payload,
-    stageMetrics: normalizeStageMetrics(payload.stageMetrics),
+    pipelineVelocity: calculatePipelineVelocity(payload, history),
   });
+}
 
-  const currentSnapshots = await readWeeklySnapshots();
-  const nextSnapshot = weeklySnapshotSchema.parse({
-    ...safePayload,
-    updatedAt: new Date().toISOString(),
-  });
+export async function readSnapshotRevisions(weekOf: string) {
+  return listSnapshotRevisions(weekOf);
+}
 
-  const snapshotIndex = currentSnapshots.findIndex(
-    (snapshot) => snapshot.weekOf === nextSnapshot.weekOf,
-  );
+export async function readMetricTargets() {
+  return listMetricTargets();
+}
 
-  const nextSnapshots = [...currentSnapshots];
-
-  if (snapshotIndex >= 0) {
-    nextSnapshots[snapshotIndex] = nextSnapshot;
-  } else {
-    nextSnapshots.push(nextSnapshot);
-  }
-
-  const sortedSnapshots = sortSnapshots(nextSnapshots);
-
-  await mkdir(path.dirname(dashboardDataFilePath), { recursive: true });
-  await writeFile(
-    dashboardDataFilePath,
-    `${JSON.stringify(sortedSnapshots, null, 2)}\n`,
-    "utf8",
-  );
-
-  return nextSnapshot;
+export async function readAlertSubscriptions() {
+  return listAlertSubscriptions();
 }

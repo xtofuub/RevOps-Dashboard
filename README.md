@@ -1,36 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RevOps Dashboard
 
-## Getting Started
+An internal operating dashboard for weekly RevOps snapshots. The app is built with Next.js 16, React 19, shadcn/ui, Recharts, and SQLite-backed snapshot history.
 
-First, run the development server:
+## What it does
+
+- Shows weekly revenue, product-market, and delivery health in a single dashboard
+- Stores weekly snapshots in SQLite with immutable revision history
+- Auto-calculates `pipelineVelocity` from saved snapshot history instead of requiring manual entry
+- Projects a directional `+7d` and `+30d` estimate from saved weekly trends
+- Exports the saved timeline to Excel
+
+## Quick start
+
+```bash
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000/dashboard](http://localhost:3000/dashboard).
+
+## Commands
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run lint
+npm run build
+npm run test
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Data storage
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Primary storage: `data/revops-dashboard.db`
+- Legacy seed source: `data/weekly-metrics.json`
+- Saving the same `weekOf` again creates a new revision and updates the latest visible version for that week
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Useful environment overrides:
 
-## Learn More
+```bash
+REVOPS_DASHBOARD_DB_PATH=/custom/path/revops-dashboard.db
+REVOPS_LEGACY_SNAPSHOT_PATH=/custom/path/weekly-metrics.json
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Important routes
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `/dashboard` - main dashboard
+- `/api/weekly-snapshots` - timeline GET and snapshot POST
+- `/api/weekly-snapshots/[weekOf]/revisions` - revision history for a reporting week
+- `/api/export/weekly-snapshots` - Excel export
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Project docs
 
-## Deploy on Vercel
+- [Developer Guide](docs/developer-guide.md)
+- [User Guide](docs/user-guide.md)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Key implementation files
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `components/dashboard-workspace.tsx` - main dashboard surface
+- `components/weekly-update-form.tsx` - weekly snapshot form
+- `lib/kpi-dashboard.ts` - schemas, metric definitions, formatting, derived velocity logic
+- `lib/dashboard-forecast.ts` - 7 day and 30 day projection logic
+- `lib/dashboard-db.ts` - SQLite schema, migration, revision persistence
+- `lib/dashboard-store.ts` - server-side data access
+
+## Notes for maintainers
+
+- This repo uses a newer Next.js version than older examples online. Read the local docs in `node_modules/next/dist/docs/` before making framework-level changes.
+- Keep UI changes conservative unless explicitly requested. Most product work should land in data flow, reporting logic, and maintainability first.
+- The forecast is directional, not a committed target. Treat it as an operating signal.
