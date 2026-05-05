@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   createSnapshotRevision,
+  deleteSnapshot,
   listAlertSubscriptions,
   listMetricTargets,
   listSnapshotRevisions,
@@ -23,6 +24,10 @@ export async function upsertWeeklySnapshot(payload: WeeklySnapshotPayload) {
     ...payload,
     pipelineVelocity: calculatePipelineVelocity(payload, history),
   });
+}
+
+export async function deleteWeeklySnapshot(weekOf: string) {
+  return deleteSnapshot(weekOf);
 }
 
 export async function readSnapshotRevisions(weekOf: string) {

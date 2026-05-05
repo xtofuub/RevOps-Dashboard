@@ -1,19 +1,20 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Manrope } from "next/font/google";
+import { Geist_Mono, Inter_Tight } from "next/font/google";
 
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
-const manrope = Manrope({
+const interTight = Inter_Tight({
   subsets: ["latin"],
-  variable: "--font-manrope",
+  variable: "--font-inter-tight",
+  weight: ["300", "400", "500", "600", "700"],
 });
 
-const ibmPlexMono = IBM_Plex_Mono({
+const geistMono = Geist_Mono({
   subsets: ["latin"],
-  variable: "--font-ibm-plex-mono",
+  variable: "--font-geist-mono",
   weight: ["400", "500"],
 });
 
@@ -32,9 +33,9 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${manrope.variable} ${ibmPlexMono.variable} h-full antialiased`}
+      className={`${interTight.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-background text-foreground">
+      <body className="min-h-full bg-background text-foreground font-[family-name:var(--font-inter-tight)]">
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

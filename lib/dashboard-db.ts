@@ -527,7 +527,7 @@ export function listAlertSubscriptions() {
     .all(workspaceId) as Array<{
     metric_key: AlertSubscription["metricKey"];
     recipient: string;
-    channel: AlertSubscription["channel"];
+    channel: string;
     is_enabled: number;
     created_at: string;
   }>;
@@ -535,10 +535,44 @@ export function listAlertSubscriptions() {
   return rows.map<AlertSubscription>((row) => ({
     metricKey: row.metric_key,
     recipient: row.recipient,
-    channel: row.channel,
+    channel: row.channel as AlertSubscription["channel"],
     isEnabled: Boolean(row.is_enabled),
     createdAt: row.created_at,
   }));
+}
+
+export function deleteSnapshot(weekOf: string) {
+  const db = getDatabase();
+  const workspaceId = getWorkspaceId(db);
+
+  const deleteTransaction = db.transaction(() => {
+    const snapshot = db
+      .prepare(`
+        SELECT id FROM snapshots
+        WHERE workspace_id = ? AND week_of = ?
+      `)
+      .get(workspaceId, weekOf) as { id: number } | undefined;
+
+    if (!snapshot) {
+      return false;
+    }
+
+    db.prepare(`
+      UPDATE snapshots SET latest_revision_id = NULL WHERE id = ?
+    `).run(snapshot.id);
+
+    db.prepare(`
+      DELETE FROM snapshot_revisions WHERE snapshot_id = ?
+    `).run(snapshot.id);
+
+    db.prepare(`
+      DELETE FROM snapshots WHERE id = ?
+    `).run(snapshot.id);
+
+    return true;
+  });
+
+  return deleteTransaction();
 }
 
 export function resetDashboardDatabaseForTests() {

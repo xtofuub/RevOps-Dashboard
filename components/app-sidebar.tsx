@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { type LucideIcon } from "lucide-react";
 import {
   ChartBarIcon,
   CommandIcon,
@@ -11,7 +12,6 @@ import {
   TriangleAlertIcon,
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import {
   Sidebar,
   SidebarContent,
@@ -31,8 +31,9 @@ import {
   type DashboardData,
   type DashboardTab,
 } from "@/lib/kpi-dashboard";
+import { Badge } from "@/components/ui/badge";
 
-const tabIcons: Record<DashboardTab, React.ComponentType> = {
+const tabIcons: Record<DashboardTab, LucideIcon> = {
   overview: LayoutDashboardIcon,
   "revenue-engine": ChartBarIcon,
   "product-market-signal": ListIcon,
@@ -55,22 +56,22 @@ export function AppSidebar({
   const latestSnapshot = dashboard.latestSnapshot;
 
   return (
-    <Sidebar collapsible="offcanvas" variant="inset" {...props}>
-      <SidebarHeader>
+    <Sidebar collapsible="offcanvas" variant="sidebar" {...props}>
+      <SidebarHeader className="px-3 py-4">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={() => onTabChange("overview")}
-              className="h-auto gap-3 px-3 py-3"
+              className="h-auto gap-3 px-0 py-1 hover:bg-transparent hover:text-foreground data-active:bg-transparent data-active:text-foreground"
               tooltip="Open overview"
             >
-              <div className="flex size-9 items-center justify-center rounded-md border border-sidebar-border bg-sidebar-primary text-sidebar-primary-foreground">
-                <CommandIcon />
+              <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <CommandIcon className="size-5" />
               </div>
               <div className="flex min-w-0 flex-col gap-0.5">
-                <span className="truncate text-sm font-semibold">Fitsec</span>
-                <span className="truncate text-xs text-sidebar-foreground/70">
-                  Weekly operating dashboard
+                <span className="truncate text-base font-semibold tracking-tight">Fitsec</span>
+                <span className="truncate text-xs text-muted-foreground/70 font-normal">
+                  Operating dashboard
                 </span>
               </div>
             </SidebarMenuButton>
@@ -78,11 +79,13 @@ export function AppSidebar({
         </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Views</SidebarGroupLabel>
+      <SidebarContent className="px-2">
+        <SidebarGroup className="px-0">
+          <SidebarGroupLabel className="px-2 mb-2 text-[10px] font-medium uppercase tracking-widest text-muted-foreground/60">
+            Views
+          </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-1">
               {DASHBOARD_TABS.map((tab) => {
                 const Icon = tabIcons[tab.id];
 
@@ -92,9 +95,12 @@ export function AppSidebar({
                       isActive={tab.id === activeTab}
                       onClick={() => onTabChange(tab.id)}
                       tooltip={tab.label}
+                      className="h-10 px-3 rounded-lg data-active:bg-primary/10 data-active:text-primary data-active:font-medium"
                     >
-                      <Icon />
-                      <span>{tab.label}</span>
+                      <span className="flex size-[18px] items-center justify-center text-muted-foreground data-active:text-primary">
+                        <Icon className="size-[18px]" />
+                      </span>
+                      <span className="text-sm">{tab.label}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
@@ -105,22 +111,24 @@ export function AppSidebar({
 
         {dashboard.healthAlerts.length ? (
           <>
-            <SidebarSeparator />
+            <SidebarSeparator className="my-3" />
 
-            <SidebarGroup>
-              <SidebarGroupLabel>Watch list</SidebarGroupLabel>
+            <SidebarGroup className="px-0">
+              <SidebarGroupLabel className="px-2 mb-2 text-[10px] font-medium uppercase tracking-widest text-muted-foreground/60">
+                Watch list
+              </SidebarGroupLabel>
               <SidebarGroupContent>
-                <div className="flex flex-col gap-2 px-2">
+                <div className="flex flex-col gap-2 px-1">
                   {dashboard.healthAlerts.map((alert) => (
                     <div
                       key={alert.id}
-                      className="rounded-md border border-sidebar-border bg-sidebar-accent p-3 text-xs leading-relaxed text-sidebar-foreground/80"
+                      className="rounded-lg border border-border/50 bg-card/50 p-3 text-xs leading-relaxed text-muted-foreground"
                     >
-                      <div className="flex items-center gap-2 font-medium text-sidebar-foreground">
-                        <TriangleAlertIcon />
-                        <span>{alert.title}</span>
+                      <div className="flex items-center gap-2 font-medium text-foreground">
+                        <TriangleAlertIcon className="size-3.5 text-amber-500" />
+                        <span className="text-xs">{alert.title}</span>
                       </div>
-                      <p className="mt-1">{alert.description}</p>
+                      <p className="mt-1.5 text-xs">{alert.description}</p>
                     </div>
                   ))}
                 </div>
@@ -130,20 +138,22 @@ export function AppSidebar({
         ) : null}
       </SidebarContent>
 
-      <SidebarFooter>
-        <div className="flex flex-col gap-3 rounded-md border border-sidebar-border bg-sidebar-accent p-3">
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="outline">{dashboard.totalWeeks} weeks</Badge>
+      <SidebarFooter className="p-3">
+        <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card/30 p-3">
+          <div className="flex flex-wrap gap-1.5">
+            <Badge variant="outline" className="text-[10px] font-medium px-2 py-0 h-5">
+              {dashboard.totalWeeks} weeks
+            </Badge>
             {latestSnapshot ? (
-              <Badge variant="outline">
+              <Badge variant="outline" className="text-[10px] font-medium px-2 py-0 h-5">
                 {formatWeekLabelWithYear(latestSnapshot.weekOf)}
               </Badge>
             ) : null}
           </div>
-          <div className="text-xs leading-relaxed text-sidebar-foreground/75">
+          <div className="text-[11px] leading-relaxed text-muted-foreground/70">
             {dashboard.lastUpdatedLabel
-              ? `Latest save: ${dashboard.lastUpdatedLabel}`
-              : "No weekly snapshots saved yet."}
+              ? `Updated ${dashboard.lastUpdatedLabel}`
+              : "No snapshots saved yet."}
           </div>
         </div>
       </SidebarFooter>

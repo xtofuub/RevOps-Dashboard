@@ -7,6 +7,7 @@ import {
   DatabaseIcon,
   RefreshCwIcon,
   SaveIcon,
+  Trash2Icon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -33,6 +34,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Field,
   FieldContent,
@@ -241,6 +251,7 @@ export function WeeklyUpdateForm({
   const [formState, setFormState] = React.useState<WeeklyFormState>(() =>
     buildFormState(latestSnapshot, suggestedWeekOf, snapshots),
   );
+  const [deletingWeekOf, setDeletingWeekOf] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     setTemplateSelection("today");
@@ -256,6 +267,38 @@ export function WeeklyUpdateForm({
     parseOptionalNumberInput(formState.proposalsSent) !== null &&
     (parseOptionalNumberInput(formState.proposalsSent) ?? 0) > 0 &&
     parseOptionalNumberInput(formState.ordersWon) !== null;
+
+  async function handleDeleteSnapshot(weekOf: string) {
+    setDeletingWeekOf(weekOf);
+    try {
+      const response = await fetch(`/api/weekly-snapshots?weekOf=${encodeURIComponent(weekOf)}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const body = await response.json();
+        toast.error(body.message ?? "Failed to delete snapshot.");
+        return;
+      }
+
+      toast.success(`Deleted snapshot for week ending ${formatWeekLabelWithYear(weekOf)}.`);
+
+      if (formState.weekOf === weekOf) {
+        startTransition(() => {
+          router.refresh();
+        });
+      } else {
+        startTransition(() => {
+          router.refresh();
+        });
+      }
+    } catch (error) {
+      console.error("Failed to delete weekly snapshot", error);
+      toast.error("The weekly snapshot could not be deleted.");
+    } finally {
+      setDeletingWeekOf(null);
+    }
+  }
 
   function updateNumericField(key: NumericMetricKey, value: string) {
     setFormState((currentState) =>
@@ -692,14 +735,51 @@ export function WeeklyUpdateForm({
           ))}
         </CardContent>
 
-        <CardFooter className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 bg-muted/20">
-          <div className="text-sm text-muted-foreground">
+        <CardFooter className="flex flex-wrap items-center justify-end gap-3 border-t border-border/60 bg-muted/20">
+          <div className="mr-auto text-sm text-muted-foreground">
             Values are validated on save and stored in durable weekly history
             with immutable revisions.
           </div>
+          {currentStoredSnapshot ? (
+            <Dialog>
+              <DialogTrigger render={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-destructive/50 text-destructive hover:bg-destructive/10 hover:border-destructive"
+                  disabled={isSaving}
+                >
+                  <Trash2Icon data-icon="inline-start" className="size-3.5" />
+                  Delete
+                </Button>
+              } />
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Delete snapshot?</DialogTitle>
+                  <DialogDescription>
+                    This will permanently delete the snapshot for{" "}
+                    <span className="font-medium text-foreground">
+                      {formatWeekLabelWithYear(currentStoredSnapshot.weekOf)}
+                    </span>
+                    . This action cannot be undone.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter showCloseButton>
+                  <Button
+                    variant="outline"
+                    className="border-destructive/50 text-destructive hover:bg-destructive/10"
+                    onClick={() => handleDeleteSnapshot(currentStoredSnapshot.weekOf)}
+                    disabled={deletingWeekOf === currentStoredSnapshot.weekOf || isSaving}
+                  >
+                    {deletingWeekOf === currentStoredSnapshot.weekOf ? "Deleting..." : "Delete snapshot"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          ) : null}
           <Button type="submit" disabled={isSaving}>
             <SaveIcon data-icon="inline-start" />
-            {isSaving ? "Saving snapshot..." : "Save weekly snapshot"}
+            {isSaving ? "Saving..." : "Save snapshot"}
           </Button>
         </CardFooter>
       </form>

@@ -944,7 +944,7 @@ export function DashboardWorkspace({
         onTabChange={setActiveTab}
         dashboard={dashboard}
       />
-      <SidebarInset className="min-h-svh overflow-hidden border border-border bg-background">
+      <SidebarInset className="min-h-svh overflow-hidden border-l border-border/60 bg-background/50 backdrop-blur-sm">
         <SiteHeader
           activeTab={activeTab}
           onTabChange={setActiveTab}

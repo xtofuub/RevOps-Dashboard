@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { buildDashboardForecast } from "@/lib/dashboard-forecast";
-import { readWeeklySnapshots, upsertWeeklySnapshot } from "@/lib/dashboard-store";
+import { deleteWeeklySnapshot, readWeeklySnapshots, upsertWeeklySnapshot } from "@/lib/dashboard-store";
 import { buildDashboardData, weeklySnapshotPayloadSchema } from "@/lib/kpi-dashboard";
 
 export const dynamic = "force-dynamic";
@@ -64,6 +64,41 @@ export async function POST(request: Request) {
       {
         message:
           "The weekly snapshot could not be saved. Please try again in a moment.",
+      },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const url = new URL(request.url);
+    const weekOf = url.searchParams.get("weekOf");
+
+    if (!weekOf) {
+      return NextResponse.json(
+        { message: "Missing weekOf parameter." },
+        { status: 400 },
+      );
+    }
+
+    const deleted = await deleteWeeklySnapshot(weekOf);
+
+    if (!deleted) {
+      return NextResponse.json(
+        { message: "Snapshot not found." },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Failed to delete weekly snapshot", error);
+
+    return NextResponse.json(
+      {
+        message:
+          "The weekly snapshot could not be deleted. Please try again in a moment.",
       },
       { status: 500 },
     );
