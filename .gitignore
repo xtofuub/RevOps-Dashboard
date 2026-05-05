@@ -44,3 +44,4 @@ data/*.db*
 next-env.d.ts
 
 .vercel
+.claude

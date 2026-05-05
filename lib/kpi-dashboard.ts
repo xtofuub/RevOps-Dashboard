@@ -83,10 +83,7 @@ export const weeklySnapshotPayloadSchema = z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/)
       .refine(isCanonicalIsoDate, {
-        message: "Enter a valid week ending date.",
-      })
-      .refine(isWeekEndingDate, {
-        message: "Week ending date must be a Friday.",
+        message: "Enter a valid reporting date.",
       }),
     newCustomersPerMonth: z.number().min(0).max(100000),
     pipelineValue: z.number().min(0).max(1_000_000_000),
@@ -734,9 +731,11 @@ export function getCurrentWeekEndingFriday(referenceDate = new Date()) {
 
 export function getSuggestedWeekOf(_latestWeekOf?: string | null) {
   void _latestWeekOf;
-  const weekEnding = getCurrentWeekEndingFriday();
+  const today = new Date();
 
-  return formatWeekOf(weekEnding);
+  return formatIsoDate(
+    new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())),
+  );
 }
 
 export function normalizeTextEntry(value: string) {

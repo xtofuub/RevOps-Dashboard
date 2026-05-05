@@ -75,7 +75,7 @@ export function SiteHeader({
               <DialogTitle>Metric notes</DialogTitle>
               <DialogDescription>
                 Use the weekly update tab to submit one full operating snapshot
-                per week-ending Friday.
+                per reporting date.
               </DialogDescription>
             </DialogHeader>
 

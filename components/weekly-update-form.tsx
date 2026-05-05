@@ -90,7 +90,26 @@ function syncDerivedMetrics(
 ): WeeklyFormState {
   const pipelineValue = parseOptionalNumberInput(formState.pipelineValue);
   const salesCycleDays = parseOptionalNumberInput(formState.salesCycleDays);
-  const closeRatePct = parseOptionalNumberInput(formState.closeRatePct);
+  const ordersWon = parseOptionalNumberInput(formState.ordersWon);
+  const proposalsSent = parseOptionalNumberInput(formState.proposalsSent);
+
+  // Auto-calculate close rate from orders won / proposals sent
+  const derivedCloseRatePct =
+    ordersWon !== null && proposalsSent !== null && proposalsSent > 0
+      ? Math.min(100, (ordersWon / proposalsSent) * 100)
+      : null;
+
+  const closeRatePct =
+    derivedCloseRatePct !== null
+      ? derivedCloseRatePct
+      : parseOptionalNumberInput(formState.closeRatePct);
+
+  const updatedState: WeeklyFormState = {
+    ...formState,
+    ...(derivedCloseRatePct !== null
+      ? { closeRatePct: String(Math.round(derivedCloseRatePct * 10) / 10) }
+      : {}),
+  };
 
   if (
     pipelineValue === null ||
@@ -99,13 +118,13 @@ function syncDerivedMetrics(
     salesCycleDays <= 0
   ) {
     return {
-      ...formState,
+      ...updatedState,
       pipelineVelocity: "",
     };
   }
 
   return {
-    ...formState,
+    ...updatedState,
     pipelineVelocity: String(
       calculatePipelineVelocity(
         {
@@ -215,7 +234,7 @@ export function WeeklyUpdateForm({
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isRefreshing, startTransition] = React.useTransition();
   const [templateSelection, setTemplateSelection] =
-    React.useState("this-week-friday");
+    React.useState("today");
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>(
     {},
   );
@@ -224,7 +243,7 @@ export function WeeklyUpdateForm({
   );
 
   React.useEffect(() => {
-    setTemplateSelection("this-week-friday");
+    setTemplateSelection("today");
     setFieldErrors({});
     setFormState(buildFormState(latestSnapshot, suggestedWeekOf, snapshots));
   }, [latestSnapshot, snapshots, suggestedWeekOf]);
@@ -232,6 +251,11 @@ export function WeeklyUpdateForm({
   const currentStoredSnapshot =
     snapshots.find((snapshot) => snapshot.weekOf === formState.weekOf) ?? null;
   const isSaving = isSubmitting || isRefreshing;
+
+  const isCloseRateAutoCalc =
+    parseOptionalNumberInput(formState.proposalsSent) !== null &&
+    (parseOptionalNumberInput(formState.proposalsSent) ?? 0) > 0 &&
+    parseOptionalNumberInput(formState.ordersWon) !== null;
 
   function updateNumericField(key: NumericMetricKey, value: string) {
     setFormState((currentState) =>
@@ -271,7 +295,7 @@ export function WeeklyUpdateForm({
     setTemplateSelection(selection);
     setFieldErrors({});
 
-    if (selection === "this-week-friday") {
+    if (selection === "today") {
       setFormState(buildFormState(latestSnapshot, suggestedWeekOf, snapshots));
       return;
     }
@@ -330,14 +354,14 @@ export function WeeklyUpdateForm({
           <div className="flex flex-col gap-1">
             <CardTitle>Weekly update</CardTitle>
             <CardDescription>
-              Push the full KPI snapshot for one Friday week-ending reporting
-              date. Saving the same week again creates a new revision so the
-              prior version stays in history.
+              Push the full KPI snapshot for any reporting date. Saving the
+              same date again creates a new revision so the prior version stays
+              in history.
             </CardDescription>
           </div>
           <Badge variant="outline">
             <CalendarDaysIcon data-icon="inline-start" />
-            Friday-based history
+            Date-based history
           </Badge>
         </div>
         <Alert>
@@ -379,7 +403,7 @@ export function WeeklyUpdateForm({
                     }
                   />
                   <FieldDescription>
-                    Use the Friday that ends the reporting week.
+                    Defaults to today. Any date is valid.
                   </FieldDescription>
                   <FieldError>{fieldErrors.weekOf}</FieldError>
                 </FieldContent>
@@ -402,8 +426,8 @@ export function WeeklyUpdateForm({
                     <SelectContent>
                       <SelectGroup>
                         <SelectLabel>Starting point</SelectLabel>
-                        <SelectItem value="this-week-friday">
-                          This week&apos;s Friday
+                        <SelectItem value="today">
+                          Today&apos;s date
                         </SelectItem>
                         {[...snapshots]
                           .sort((left, right) =>
@@ -421,8 +445,8 @@ export function WeeklyUpdateForm({
                     </SelectContent>
                   </Select>
                   <FieldDescription>
-                    Load an existing Friday to edit it, or start from the
-                    latest saved snapshot using this week&apos;s Friday.
+                    Load an existing date to edit it, or start fresh from
+                    today&apos;s date.
                   </FieldDescription>
                 </FieldContent>
               </Field>
@@ -432,7 +456,7 @@ export function WeeklyUpdateForm({
                   type="button"
                   variant="outline"
                   className="w-full lg:w-auto"
-                  onClick={() => loadTemplate("this-week-friday")}
+                  onClick={() => loadTemplate("today")}
                 >
                   <RefreshCwIcon data-icon="inline-start" />
                   Use latest template
@@ -452,37 +476,47 @@ export function WeeklyUpdateForm({
               </CardHeader>
               <CardContent className="flex flex-col gap-6">
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {section.fields.map((field) => (
-                    <Field
-                      key={field.key}
-                      data-invalid={Boolean(fieldErrors[field.key])}
-                      data-disabled={field.key === "pipelineVelocity"}
-                    >
-                      <FieldLabel htmlFor={field.key}>{field.label}</FieldLabel>
-                      <FieldContent>
-                        <Input
-                          id={field.key}
-                          type="number"
-                          inputMode="decimal"
-                          min={field.min}
-                          max={field.max}
-                          step={field.step}
-                          value={formState[field.key]}
-                          disabled={field.key === "pipelineVelocity"}
-                          aria-invalid={Boolean(fieldErrors[field.key])}
-                          onChange={(event) =>
-                            updateNumericField(field.key, event.target.value)
-                          }
-                        />
-                        <FieldDescription>
-                          {field.key === "pipelineVelocity"
-                            ? "Calculated automatically from saved history using pipeline value, close rate, and sales cycle."
-                            : field.description}
-                        </FieldDescription>
-                        <FieldError>{fieldErrors[field.key]}</FieldError>
-                      </FieldContent>
-                    </Field>
-                  ))}
+                  {section.fields.map((field) => {
+                    const isAutoCalc =
+                      field.key === "pipelineVelocity" ||
+                      (field.key === "closeRatePct" && isCloseRateAutoCalc);
+
+                    return (
+                      <Field
+                        key={field.key}
+                        data-invalid={Boolean(fieldErrors[field.key])}
+                        data-disabled={isAutoCalc}
+                      >
+                        <FieldLabel htmlFor={field.key}>{field.label}</FieldLabel>
+                        <FieldContent>
+                          <Input
+                            id={field.key}
+                            type="number"
+                            inputMode="decimal"
+                            min={field.min}
+                            max={field.max}
+                            step={field.step}
+                            value={formState[field.key]}
+                            disabled={isAutoCalc}
+                            aria-invalid={Boolean(fieldErrors[field.key])}
+                            onChange={(event) =>
+                              updateNumericField(field.key, event.target.value)
+                            }
+                          />
+                          <FieldDescription>
+                            {field.key === "pipelineVelocity"
+                              ? "Calculated automatically from saved history using pipeline value, close rate, and sales cycle."
+                              : field.key === "closeRatePct"
+                                ? isCloseRateAutoCalc
+                                  ? "Calculated automatically from orders won ÷ proposals sent."
+                                  : "Win rate. Auto-fills when proposals sent and orders won are both entered."
+                                : field.description}
+                          </FieldDescription>
+                          <FieldError>{fieldErrors[field.key]}</FieldError>
+                        </FieldContent>
+                      </Field>
+                    );
+                  })}
                 </div>
 
                 {section.id === "revenue-engine" ? (

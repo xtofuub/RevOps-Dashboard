@@ -962,40 +962,6 @@ export function DashboardWorkspace({
           className="@container/main flex flex-1 flex-col gap-0"
         >
           <div className="sticky top-0 z-20 border-b border-border bg-background px-4 py-4 lg:px-6">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="flex max-w-2xl flex-col gap-1">
-                <h2 className="font-heading text-xl font-semibold tracking-tight">
-                  {activeTabMeta.label}
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {activeTabMeta.description}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="outline">
-                  {dashboard.totalWeeks} weekly snapshots
-                </Badge>
-                {dashboard.lastUpdatedLabel ? (
-                  <Badge variant="outline">
-                    Updated {dashboard.lastUpdatedLabel}
-                  </Badge>
-                ) : null}
-              </div>
-            </div>
-            <div className="mt-4 overflow-x-auto">
-              <TabsList variant="line" className="gap-3 bg-transparent p-0">
-                {DASHBOARD_TABS.map((tab) => {
-                  const Icon = tabIconMap[tab.id];
-
-                  return (
-                    <TabsTrigger key={tab.id} value={tab.id}>
-                      <Icon data-icon="inline-start" />
-                      {tab.label}
-                    </TabsTrigger>
-                  );
-                })}
-              </TabsList>
-            </div>
             {hasData && activeTab !== "weekly-update" ? (
               <div className="mt-3 border-t border-border pt-3">
                 <div className="flex flex-col gap-3">
@@ -1685,7 +1651,7 @@ function WeeklyUpdateSection({
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3 text-sm text-muted-foreground">
-            <p>Use one full snapshot per Friday week-ending date.</p>
+            <p>Use one full snapshot per reporting date.</p>
             <p>
               Re-saving the same week creates a new revision while keeping the
               earlier saved version available in history.
