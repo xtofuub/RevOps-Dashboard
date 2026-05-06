@@ -10,6 +10,7 @@ import {
   LayoutDashboardIcon,
   ListIcon,
   LogOutIcon,
+  ShieldCheckIcon,
   TriangleAlertIcon,
 } from "lucide-react";
 
@@ -26,6 +27,7 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
+import { ADMIN_VIEW_ID, type WorkspaceView } from "@/lib/dashboard-navigation";
 import {
   DASHBOARD_TABS,
   type DashboardData,
@@ -42,20 +44,19 @@ const tabIcons: Record<DashboardTab, LucideIcon> = {
 };
 
 type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
-  activeTab: DashboardTab;
+  activeView: WorkspaceView;
   dashboard: DashboardData;
-  onTabChange: (tab: DashboardTab) => void;
+  onViewChange: (view: WorkspaceView) => void;
   user: { username: string; role: string };
 };
 
 export function AppSidebar({
-  activeTab,
+  activeView,
   dashboard,
-  onTabChange,
+  onViewChange,
   user,
   ...props
 }: AppSidebarProps) {
-
   return (
     <Sidebar collapsible="offcanvas" variant="sidebar" {...props}>
       <SidebarHeader className="px-4 py-3 border-b border-border/40">
@@ -79,8 +80,8 @@ export function AppSidebar({
                 return (
                   <SidebarMenuItem key={tab.id}>
                     <SidebarMenuButton
-                      isActive={tab.id === activeTab}
-                      onClick={() => onTabChange(tab.id)}
+                      isActive={tab.id === activeView}
+                      onClick={() => onViewChange(tab.id)}
                       tooltip={tab.label}
                       className="gap-2.5 px-2 text-muted-foreground data-active:text-foreground data-active:bg-accent"
                     >
@@ -93,6 +94,32 @@ export function AppSidebar({
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {user.role === "admin" ? (
+          <>
+            <SidebarSeparator className="my-2" />
+            <SidebarGroup className="px-0 py-0">
+              <SidebarGroupLabel className="px-2 text-xs text-muted-foreground/50 font-normal mb-1">
+                Admin
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={activeView === ADMIN_VIEW_ID}
+                      onClick={() => onViewChange(ADMIN_VIEW_ID)}
+                      tooltip="Admin Panel"
+                      className="gap-2.5 px-2 text-muted-foreground data-active:text-foreground data-active:bg-accent"
+                    >
+                      <ShieldCheckIcon className="size-4 shrink-0" />
+                      <span className="text-sm font-normal">Admin Panel</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        ) : null}
 
         {dashboard.healthAlerts.length ? (
           <>

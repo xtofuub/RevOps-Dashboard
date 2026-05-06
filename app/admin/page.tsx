@@ -19,7 +19,7 @@ export default async function AdminPage() {
   const users = getAllUsers()
 
   return (
-    <div className="container mx-auto p-6">
+    <div className="min-h-screen bg-background">
       <AdminPanel users={users} currentUser={session.user} />
     </div>
   )

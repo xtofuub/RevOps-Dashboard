@@ -1,7 +1,9 @@
 import { cookies } from "next/headers";
 
+import { getUserById, getUserByUsername, listUsers } from "@/lib/user-store";
+
 interface Session {
-  user: { id: string; username: string; role: string };
+  user: { id: string; username: string; name: string; role: string };
 }
 
 export async function auth(): Promise<Session | null> {
@@ -9,17 +11,26 @@ export async function auth(): Promise<Session | null> {
   const raw = jar.get("session")?.value;
   if (!raw) return null;
   try {
-    const { username, role } = JSON.parse(raw);
-    if (!username) return null;
-    return { user: { id: "1", username, role } };
+    const { id, username } = JSON.parse(raw);
+    const user =
+      (typeof id === "string" && getUserById(id)) ||
+      (typeof username === "string" && getUserByUsername(username));
+
+    if (!user) return null;
+
+    return {
+      user: {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        role: user.role,
+      },
+    };
   } catch {
     return null;
   }
 }
 
 export function getAllUsers() {
-  return [
-    { id: "1", username: "admin", name: "Admin User", role: "admin" as const, createdAt: new Date().toISOString() },
-    { id: "2", username: "user", name: "Regular User", role: "user" as const, createdAt: new Date().toISOString() },
-  ]
+  return listUsers();
 }

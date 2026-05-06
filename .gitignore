@@ -32,6 +32,9 @@ yarn-error.log*
 
 # local dashboard data
 data/*.db*
+data/users.json
+.next-dev-*.log
+.playwright-cli/
 
 # env files (can opt-in for committing if needed)
 .env*

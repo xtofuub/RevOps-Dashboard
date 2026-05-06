@@ -18,26 +18,29 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
-  DASHBOARD_TABS,
+  ADMIN_VIEW_ID,
+  getWorkspaceViewMeta,
+  type WorkspaceView,
+} from "@/lib/dashboard-navigation";
+import {
   KPI_FORM_SECTIONS,
-  type DashboardTab,
 } from "@/lib/kpi-dashboard";
 
 type SiteHeaderProps = {
-  activeTab: DashboardTab;
+  activeView: WorkspaceView;
   lastUpdatedLabel: string | null;
-  onTabChange: (tab: DashboardTab) => void;
+  onViewChange: (view: WorkspaceView) => void;
   totalWeeks: number;
 };
 
 export function SiteHeader({
-  activeTab,
+  activeView,
   lastUpdatedLabel,
-  onTabChange,
+  onViewChange,
   totalWeeks,
 }: SiteHeaderProps) {
-  const activeTabMeta =
-    DASHBOARD_TABS.find((tab) => tab.id === activeTab) ?? DASHBOARD_TABS[0];
+  const activeViewMeta = getWorkspaceViewMeta(activeView);
+  const isAdminView = activeView === ADMIN_VIEW_ID;
 
   return (
     <header className="flex h-(--header-height) shrink-0 items-center border-b border-border/60 bg-background/80 backdrop-blur-sm">
@@ -50,10 +53,10 @@ export function SiteHeader({
 
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <div className="truncate text-sm font-semibold tracking-tight">
-            {activeTabMeta.label}
+            {activeViewMeta.label}
           </div>
           <div className="hidden truncate text-xs text-muted-foreground/70 md:block">
-            {activeTabMeta.description}
+            {activeViewMeta.description}
           </div>
         </div>
 
@@ -68,7 +71,7 @@ export function SiteHeader({
           ) : null}
         </div>
 
-        <ExportWorkbookButton disabled={totalWeeks === 0} />
+        <ExportWorkbookButton disabled={totalWeeks === 0 || isAdminView} />
         <ThemeToggle />
 
         <Dialog>
@@ -104,7 +107,7 @@ export function SiteHeader({
           </DialogContent>
         </Dialog>
 
-        <Button size="sm" onClick={() => onTabChange("weekly-update")} className="h-8 text-xs gap-1.5">
+        <Button size="sm" onClick={() => onViewChange("weekly-update")} className="h-8 text-xs gap-1.5">
           <FileTextIcon data-icon="inline-start" className="size-3.5" />
           <span className="hidden sm:inline">Weekly update</span>
         </Button>

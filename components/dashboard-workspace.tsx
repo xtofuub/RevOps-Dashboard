@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 
 import { AppSidebar } from "@/components/app-sidebar";
+import { AdminPanel } from "@/app/admin/admin-panel";
 import { SiteHeader } from "@/components/site-header";
 import { WeeklyUpdateForm } from "@/components/weekly-update-form";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -72,11 +73,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
+  ADMIN_VIEW_ID,
+  type WorkspaceView,
+} from "@/lib/dashboard-navigation";
+import {
   aggregateTextItems,
-  DASHBOARD_TABS,
   formatMetricByKey,
   formatMetricValue,
   formatWeekLabelWithYear,
@@ -97,13 +101,15 @@ import {
   type DashboardForecast,
   type ForecastProjectionPoint,
 } from "@/lib/dashboard-forecast";
+import type { PublicUser } from "@/lib/user-store";
 import { cn } from "@/lib/utils";
 
 type DashboardWorkspaceProps = {
   snapshots: WeeklySnapshot[];
   dashboard: DashboardData;
   forecast: DashboardForecast | null;
-  user: { username: string; role: string };
+  users: PublicUser[];
+  user: { id: string; username: string; name: string; role: string };
 };
 
 type ForesightDataKey = `${NumericMetricKey}Foresight`;
@@ -119,14 +125,6 @@ type ForesightChartPoint = DashboardData["timeline"][number] &
 type DeliveryVolumeChartPoint = ForesightChartPoint & {
   proposalWinRatePct?: number;
   proposalWinRatePctForesight?: number;
-};
-
-const tabIconMap: Record<DashboardTab, React.ComponentType> = {
-  overview: LayoutDashboardIcon,
-  "revenue-engine": ChartBarIcon,
-  "product-market-signal": ListIcon,
-  "delivery-stability": DatabaseIcon,
-  "weekly-update": FileTextIcon,
 };
 
 const summaryMetricIcons: Partial<
@@ -261,6 +259,10 @@ const deliveryMetricKeys: NumericMetricKey[] = [
   "feedSlaQualityScore",
   "incidentCount",
 ];
+
+function isDashboardView(view: WorkspaceView): view is DashboardTab {
+  return view !== ADMIN_VIEW_ID;
+}
 
 type TrendWindowMode = "7d" | "30d" | "weeks";
 
@@ -727,9 +729,10 @@ export function DashboardWorkspace({
   snapshots,
   dashboard,
   forecast,
+  users,
   user,
 }: DashboardWorkspaceProps) {
-  const [activeTab, setActiveTab] = React.useState<DashboardTab>("overview");
+  const [activeView, setActiveView] = React.useState<WorkspaceView>("overview");
   const [trendWindowMode, setTrendWindowMode] =
     React.useState<TrendWindowMode>("weeks");
   const [predictionMode, setPredictionMode] =
@@ -738,8 +741,9 @@ export function DashboardWorkspace({
     null,
   );
   const [selectedWeekTo, setSelectedWeekTo] = React.useState<string | null>(null);
-  const activeTabMeta =
-    DASHBOARD_TABS.find((tab) => tab.id === activeTab) ?? DASHBOARD_TABS[0];
+  const showAnalysisControls =
+    isDashboardView(activeView) &&
+    activeView !== "weekly-update";
   const latestSnapshot = dashboard.latestSnapshot;
   const hasData = Boolean(latestSnapshot);
   const weekOptions = React.useMemo(
@@ -942,30 +946,30 @@ export function DashboardWorkspace({
       className="min-h-svh bg-transparent"
     >
       <AppSidebar
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
+        activeView={activeView}
+        onViewChange={setActiveView}
         dashboard={dashboard}
         user={user}
       />
       <SidebarInset className="min-h-svh overflow-hidden border-l border-border/60 bg-background/50 backdrop-blur-sm">
         <SiteHeader
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
+          activeView={activeView}
+          onViewChange={setActiveView}
           lastUpdatedLabel={dashboard.lastUpdatedLabel}
           totalWeeks={dashboard.totalWeeks}
         />
 
         <Tabs
-          value={activeTab}
+          value={activeView}
           onValueChange={(value) => {
             if (value !== null) {
-              setActiveTab(value as DashboardTab);
+              setActiveView(value as WorkspaceView);
             }
           }}
           className="@container/main flex flex-1 flex-col gap-0"
         >
           <div className="sticky top-0 z-20 border-b border-border bg-background px-4 py-4 lg:px-6">
-            {hasData && activeTab !== "weekly-update" ? (
+            {hasData && showAnalysisControls ? (
               <div className="mt-3 border-t border-border pt-3">
                 <div className="flex flex-col gap-3">
                   <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
@@ -1251,7 +1255,7 @@ export function DashboardWorkspace({
                   />
                 </>
               ) : (
-                <EmptyDashboardState onOpenWeeklyUpdate={() => setActiveTab("weekly-update")} />
+                <EmptyDashboardState onOpenWeeklyUpdate={() => setActiveView("weekly-update")} />
               )}
             </TabsContent>
 
@@ -1275,7 +1279,7 @@ export function DashboardWorkspace({
                   />
                 </>
               ) : (
-                <EmptyDashboardState onOpenWeeklyUpdate={() => setActiveTab("weekly-update")} />
+                <EmptyDashboardState onOpenWeeklyUpdate={() => setActiveView("weekly-update")} />
               )}
             </TabsContent>
 
@@ -1298,7 +1302,7 @@ export function DashboardWorkspace({
                   />
                 </>
               ) : (
-                <EmptyDashboardState onOpenWeeklyUpdate={() => setActiveTab("weekly-update")} />
+                <EmptyDashboardState onOpenWeeklyUpdate={() => setActiveView("weekly-update")} />
               )}
             </TabsContent>
 
@@ -1316,13 +1320,23 @@ export function DashboardWorkspace({
                     />
                 </>
               ) : (
-                <EmptyDashboardState onOpenWeeklyUpdate={() => setActiveTab("weekly-update")} />
+                <EmptyDashboardState onOpenWeeklyUpdate={() => setActiveView("weekly-update")} />
               )}
             </TabsContent>
 
             <TabsContent value="weekly-update" className="flex flex-col gap-6">
               <WeeklyUpdateSection dashboard={dashboard} snapshots={snapshots} />
             </TabsContent>
+
+            {user.role === "admin" ? (
+              <TabsContent value={ADMIN_VIEW_ID} className="flex flex-col gap-6">
+                <AdminPanel
+                  users={users}
+                  currentUser={user}
+                  variant="workspace"
+                />
+              </TabsContent>
+            ) : null}
           </div>
         </Tabs>
       </SidebarInset>
