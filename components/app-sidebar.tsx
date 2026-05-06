@@ -9,6 +9,7 @@ import {
   FileTextIcon,
   LayoutDashboardIcon,
   ListIcon,
+  LogOutIcon,
   TriangleAlertIcon,
 } from "lucide-react";
 
@@ -27,11 +28,10 @@ import {
 } from "@/components/ui/sidebar";
 import {
   DASHBOARD_TABS,
-  formatWeekLabelWithYear,
   type DashboardData,
   type DashboardTab,
 } from "@/lib/kpi-dashboard";
-import { Badge } from "@/components/ui/badge";
+import { logout } from "@/app/login/actions";
 
 const tabIcons: Record<DashboardTab, LucideIcon> = {
   overview: LayoutDashboardIcon,
@@ -45,62 +45,47 @@ type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   activeTab: DashboardTab;
   dashboard: DashboardData;
   onTabChange: (tab: DashboardTab) => void;
+  user: { username: string; role: string };
 };
 
 export function AppSidebar({
   activeTab,
   dashboard,
   onTabChange,
+  user,
   ...props
 }: AppSidebarProps) {
-  const latestSnapshot = dashboard.latestSnapshot;
 
   return (
     <Sidebar collapsible="offcanvas" variant="sidebar" {...props}>
-      <SidebarHeader className="px-3 py-4">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              onClick={() => onTabChange("overview")}
-              className="h-auto gap-3 px-0 py-1 hover:bg-transparent hover:text-foreground data-active:bg-transparent data-active:text-foreground"
-              tooltip="Open overview"
-            >
-              <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <CommandIcon className="size-5" />
-              </div>
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <span className="truncate text-base font-semibold tracking-tight">Fitsec</span>
-                <span className="truncate text-xs text-muted-foreground/70 font-normal">
-                  Operating dashboard
-                </span>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+      <SidebarHeader className="px-4 py-3 border-b border-border/40">
+        <div className="flex items-center gap-2.5">
+          <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/10">
+            <CommandIcon className="size-3.5 text-primary" />
+          </div>
+          <span className="text-sm font-medium text-foreground">Fitsec</span>
+        </div>
       </SidebarHeader>
 
-      <SidebarContent className="px-2">
-        <SidebarGroup className="px-0">
-          <SidebarGroupLabel className="px-2 mb-2 text-[10px] font-medium uppercase tracking-widest text-muted-foreground/60">
+      <SidebarContent className="px-2 py-2">
+        <SidebarGroup className="px-0 py-0">
+          <SidebarGroupLabel className="px-2 text-xs text-muted-foreground/50 font-normal mb-1">
             Views
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu className="gap-1">
+            <SidebarMenu>
               {DASHBOARD_TABS.map((tab) => {
                 const Icon = tabIcons[tab.id];
-
                 return (
                   <SidebarMenuItem key={tab.id}>
                     <SidebarMenuButton
                       isActive={tab.id === activeTab}
                       onClick={() => onTabChange(tab.id)}
                       tooltip={tab.label}
-                      className="h-10 px-3 rounded-lg data-active:bg-primary/10 data-active:text-primary data-active:font-medium"
+                      className="gap-2.5 px-2 text-muted-foreground data-active:text-foreground data-active:bg-accent"
                     >
-                      <span className="flex size-[18px] items-center justify-center text-muted-foreground data-active:text-primary">
-                        <Icon className="size-[18px]" />
-                      </span>
-                      <span className="text-sm">{tab.label}</span>
+                      <Icon className="size-4 shrink-0" />
+                      <span className="text-sm font-normal">{tab.label}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
@@ -111,24 +96,23 @@ export function AppSidebar({
 
         {dashboard.healthAlerts.length ? (
           <>
-            <SidebarSeparator className="my-3" />
-
-            <SidebarGroup className="px-0">
-              <SidebarGroupLabel className="px-2 mb-2 text-[10px] font-medium uppercase tracking-widest text-muted-foreground/60">
+            <SidebarSeparator className="my-2" />
+            <SidebarGroup className="px-0 py-0">
+              <SidebarGroupLabel className="px-2 text-xs text-muted-foreground/50 font-normal mb-1">
                 Watch list
               </SidebarGroupLabel>
               <SidebarGroupContent>
-                <div className="flex flex-col gap-2 px-1">
+                <div className="flex flex-col gap-1.5 px-1">
                   {dashboard.healthAlerts.map((alert) => (
                     <div
                       key={alert.id}
-                      className="rounded-lg border border-border/50 bg-card/50 p-3 text-xs leading-relaxed text-muted-foreground"
+                      className="rounded-md border border-border/40 bg-muted/30 px-3 py-2"
                     >
-                      <div className="flex items-center gap-2 font-medium text-foreground">
-                        <TriangleAlertIcon className="size-3.5 text-amber-500" />
-                        <span className="text-xs">{alert.title}</span>
+                      <div className="flex items-center gap-1.5 text-xs text-foreground">
+                        <TriangleAlertIcon className="size-3 text-amber-500 shrink-0" />
+                        <span>{alert.title}</span>
                       </div>
-                      <p className="mt-1.5 text-xs">{alert.description}</p>
+                      <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{alert.description}</p>
                     </div>
                   ))}
                 </div>
@@ -138,23 +122,24 @@ export function AppSidebar({
         ) : null}
       </SidebarContent>
 
-      <SidebarFooter className="p-3">
-        <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card/30 p-3">
-          <div className="flex flex-wrap gap-1.5">
-            <Badge variant="outline" className="text-[10px] font-medium px-2 py-0 h-5">
-              {dashboard.totalWeeks} weeks
-            </Badge>
-            {latestSnapshot ? (
-              <Badge variant="outline" className="text-[10px] font-medium px-2 py-0 h-5">
-                {formatWeekLabelWithYear(latestSnapshot.weekOf)}
-              </Badge>
-            ) : null}
+      <SidebarFooter className="px-3 py-3 border-t border-border/40">
+        <div className="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-accent transition-colors">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-foreground text-xs font-medium">
+            {user.username[0].toUpperCase()}
           </div>
-          <div className="text-[11px] leading-relaxed text-muted-foreground/70">
-            {dashboard.lastUpdatedLabel
-              ? `Updated ${dashboard.lastUpdatedLabel}`
-              : "No snapshots saved yet."}
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate text-xs font-medium text-foreground">{user.username}</span>
+            <span className="truncate text-xs text-muted-foreground capitalize">{user.role}</span>
           </div>
+          <form action={logout} className="ml-auto shrink-0">
+            <button
+              type="submit"
+              title="Sign out"
+              className="flex size-6 items-center justify-center rounded text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <LogOutIcon className="size-3.5" />
+            </button>
+          </form>
         </div>
       </SidebarFooter>
     </Sidebar>

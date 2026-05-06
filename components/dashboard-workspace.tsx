@@ -103,6 +103,7 @@ type DashboardWorkspaceProps = {
   snapshots: WeeklySnapshot[];
   dashboard: DashboardData;
   forecast: DashboardForecast | null;
+  user: { username: string; role: string };
 };
 
 type ForesightDataKey = `${NumericMetricKey}Foresight`;
@@ -726,6 +727,7 @@ export function DashboardWorkspace({
   snapshots,
   dashboard,
   forecast,
+  user,
 }: DashboardWorkspaceProps) {
   const [activeTab, setActiveTab] = React.useState<DashboardTab>("overview");
   const [trendWindowMode, setTrendWindowMode] =
@@ -943,6 +945,7 @@ export function DashboardWorkspace({
         activeTab={activeTab}
         onTabChange={setActiveTab}
         dashboard={dashboard}
+        user={user}
       />
       <SidebarInset className="min-h-svh overflow-hidden border-l border-border/60 bg-background/50 backdrop-blur-sm">
         <SiteHeader
