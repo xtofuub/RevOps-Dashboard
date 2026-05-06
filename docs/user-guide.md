@@ -11,10 +11,16 @@ You use it to:
 - save or revise a Friday week-ending snapshot
 - export the saved history to Excel
 - check short-term directional estimates for the next 7 days and 30 days
+- manage user accounts when signed in as an admin
 
 ## Opening the dashboard
 
 Go to `/dashboard`.
+
+Sign in with the account your admin gave you. For a fresh local development setup, the seeded accounts are:
+
+- Admin: `admin` / `admin123`
+- User: `user` / `user123`
 
 The main tabs are:
 
@@ -23,6 +29,31 @@ The main tabs are:
 - `Product-Market Signal`
 - `Delivery Stability`
 - `Weekly Update`
+
+Admins also see:
+
+- `Admin Panel`
+
+Clicking `Admin Panel` in the left sidebar opens account management on the right side of the same dashboard. The browser stays on `/dashboard`.
+
+## Admin Panel
+
+The admin panel is visible only to admin users.
+
+Admins can:
+
+- create user accounts
+- delete user accounts
+- edit a user's display name
+- change a user's role between `Admin` and `User`
+- reset a user's password
+
+Safety rules:
+
+- You cannot delete the account you are currently using.
+- The dashboard keeps at least one admin account available.
+- Password changes apply immediately.
+- User account records are stored locally for the running environment.
 
 ## Saving a weekly snapshot
 

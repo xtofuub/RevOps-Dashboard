@@ -7,6 +7,7 @@
 - shadcn/ui with Base UI primitives
 - Recharts for charts
 - SQLite via `better-sqlite3`
+- Local JSON user store with bcrypt password hashes
 - Vitest for tests
 
 Before changing framework behavior, read the relevant local Next.js docs in `node_modules/next/dist/docs/`.
@@ -16,7 +17,11 @@ Before changing framework behavior, read the relevant local Next.js docs in `nod
 ### App routes
 
 - `app/dashboard/page.tsx`
-  - Server component that loads snapshots, dashboard data, and forecast data.
+  - Server component that loads snapshots, dashboard data, forecast data, and admin users when the current session is admin.
+- `app/admin/page.tsx`
+  - Direct admin route for account management. The same admin panel is also rendered inside `/dashboard` as an admin-only workspace view.
+- `app/admin/actions.ts`
+  - Server actions for creating users, updating roles/names, resetting passwords, and deleting accounts.
 - `app/api/weekly-snapshots/route.ts`
   - `GET` returns the timeline, dashboard summary, and forecast.
   - `POST` validates a snapshot payload and stores a new revision.
@@ -35,6 +40,12 @@ Before changing framework behavior, read the relevant local Next.js docs in `nod
   - Owns SQLite schema creation, migration from legacy JSON, and revision persistence.
 - `lib/dashboard-store.ts`
   - Thin server-only adapter around the DB layer.
+- `lib/auth.ts`
+  - Reads the `session` cookie, resolves it against the local user store, and returns the current user.
+- `lib/user-store.ts`
+  - Server-only JSON-backed account store. Seeds default local accounts, hashes passwords with bcrypt, and protects the final admin account.
+- `lib/dashboard-navigation.ts`
+  - Shared workspace view metadata for dashboard tabs and the admin panel view.
 - `lib/export-weekly-dashboard.ts`
   - Excel export builder.
 - `lib/weekly-snapshot-csv.ts`
@@ -43,9 +54,37 @@ Before changing framework behavior, read the relevant local Next.js docs in `nod
 ### Main UI files
 
 - `components/dashboard-workspace.tsx`
-  - Dashboard tabs, charts, tables, range controls, and the forecast card.
+  - Dashboard views, charts, tables, range controls, forecast card, and the admin workspace view.
+- `components/app-sidebar.tsx`
+  - Left navigation. Shows the `Admin Panel` item only when `user.role === "admin"`.
+- `components/site-header.tsx`
+  - Header metadata for the active workspace view.
 - `components/weekly-update-form.tsx`
   - Weekly snapshot form, validation UX, and derived field preview for pipeline velocity.
+
+## Authentication and admin accounts
+
+Authentication is intentionally lightweight for local/internal use.
+
+- Login submits to `app/login/actions.ts`.
+- Credentials are verified by `verifyUserCredentials()` in `lib/user-store.ts`.
+- The app stores an HTTP-only `session` cookie containing the user id, username, and role.
+- `auth()` always resolves the cookie against `data/users.json`, so deleted or changed users stop matching stale cookie data.
+
+Default accounts are created the first time the local user store is initialized:
+
+- `admin` / `admin123`
+- `user` / `user123`
+
+The admin panel supports:
+
+- Create user accounts
+- Edit display name and role
+- Reset passwords
+- Delete users
+- Prevent deleting or demoting the final admin
+
+The canonical local user file is `data/users.json`. It is ignored by git because it contains environment-specific account records and password hashes.
 
 ## Data model
 
@@ -111,6 +150,8 @@ npm run dev
 
 Open `http://localhost:3000/dashboard`.
 
+If you are testing from another device or VM through a LAN address such as `http://10.5.0.2:3000/dashboard`, `next.config.ts` derives `allowedDevOrigins` from local IPv4 interfaces so development HMR requests are accepted.
+
 ## Build, lint, test
 
 ```bash
@@ -124,6 +165,7 @@ npm run test
 Default files:
 
 - SQLite DB: `data/revops-dashboard.db`
+- Local users: `data/users.json`
 - Legacy JSON seed: `data/weekly-metrics.json`
 
 Optional overrides:
@@ -158,8 +200,16 @@ The tests use these environment variables to isolate temporary databases.
 3. Keep `listWeeklySnapshots()` returning only latest revisions.
 4. Keep the revisions route contract intact.
 
+### Change admin behavior
+
+1. Keep mutations in `app/admin/actions.ts` so every account change re-checks the server-side admin session.
+2. Keep local account persistence in `lib/user-store.ts`.
+3. Keep the in-dashboard view wired through `lib/dashboard-navigation.ts`, `components/app-sidebar.tsx`, and `components/dashboard-workspace.tsx`.
+4. Revalidate both `/admin` and `/dashboard` after account mutations so the direct route and workspace view stay fresh.
+
 ## Known constraints
 
 - The dashboard is currently single-workspace in practice, even though the DB schema supports workspaces.
+- The user store is local JSON, not a production identity provider.
 - The main dashboard component is still large. Prefer extracting helper cards or sections instead of adding more inline complexity.
 - Some legacy helper files may exist before a UI is fully wired. Confirm usage before removing them.
