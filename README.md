@@ -78,6 +78,7 @@ REVOPS_LEGACY_SNAPSHOT_PATH=/custom/path/weekly-metrics.json
 
 - [Developer Guide](docs/developer-guide.md)
 - [User Guide](docs/user-guide.md)
+- [Asennus](docs/asennus.md)
 
 ## Key implementation files
 
