@@ -94,6 +94,65 @@ function parseOptionalNumberInput(value: string) {
   return Number.isFinite(parsedValue) ? parsedValue : null;
 }
 
+function sanitizeNumericInput(
+  raw: string,
+  options: { allowDecimal: boolean; max: number },
+): string {
+  if (raw === "") return "";
+
+  let cleaned = raw.replace(options.allowDecimal ? /[^0-9.]/g : /[^0-9]/g, "");
+
+  if (options.allowDecimal) {
+    const firstDot = cleaned.indexOf(".");
+    if (firstDot !== -1) {
+      cleaned =
+        cleaned.slice(0, firstDot + 1) +
+        cleaned.slice(firstDot + 1).replace(/\./g, "");
+    }
+  }
+
+  cleaned = cleaned.replace(/^0+(?=\d)/, "");
+
+  if (cleaned === "" || cleaned === ".") return cleaned;
+
+  const parsed = Number(cleaned);
+  if (Number.isFinite(parsed) && parsed > options.max) {
+    return String(options.max);
+  }
+
+  return cleaned;
+}
+
+const ALLOWED_CONTROL_KEYS = new Set([
+  "Backspace",
+  "Delete",
+  "Tab",
+  "Enter",
+  "Escape",
+  "Home",
+  "End",
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowUp",
+  "ArrowDown",
+]);
+
+function makeKeyBlocker(allowDecimal: boolean) {
+  return function blockNonNumericKeys(
+    event: React.KeyboardEvent<HTMLInputElement>,
+  ) {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (ALLOWED_CONTROL_KEYS.has(event.key)) return;
+
+    const isDigit = /^\d$/.test(event.key);
+    const isDot = event.key === "." && allowDecimal;
+
+    if (!isDigit && !isDot) {
+      event.preventDefault();
+    }
+  };
+}
+
 function syncDerivedMetrics(
   formState: WeeklyFormState,
   snapshots: WeeklySnapshot[],
@@ -397,31 +456,30 @@ export function WeeklyUpdateForm({
           <div className="flex flex-col gap-1">
             <CardTitle>Weekly update</CardTitle>
             <CardDescription>
-              Push the full KPI snapshot for any reporting date. Saving the
-              same date again creates a new revision so the prior version stays
-              in history.
+              Enter your KPI numbers for any week. If you save the same week
+              again, your earlier values are kept in revision history.
             </CardDescription>
           </div>
           <Badge variant="outline">
             <CalendarDaysIcon data-icon="inline-start" />
-            Date-based history
+            One save per week
           </Badge>
         </div>
         <Alert>
           <DatabaseIcon />
           <AlertTitle>
             {currentStoredSnapshot
-              ? `${formatWeekLabelWithYear(formState.weekOf)} already exists`
-              : `You are creating ${formatWeekLabelWithYear(formState.weekOf)}`}
+              ? `Week ending ${formatWeekLabelWithYear(formState.weekOf)} already saved`
+              : `New week: ${formatWeekLabelWithYear(formState.weekOf)}`}
           </AlertTitle>
           <AlertDescription>
             {currentStoredSnapshot
-              ? "Saving now will create a fresh revision for this reporting week while keeping earlier saved versions available."
-              : "Saving now will append a new weekly snapshot to the local dashboard history."}
+              ? "Saving now creates a new revision. Your earlier values stay in history."
+              : "Saving now adds this week to your dashboard history."}
           </AlertDescription>
           <AlertAction>
             <Badge variant="outline">
-              {currentStoredSnapshot ? "New revision" : "Create"}
+              {currentStoredSnapshot ? "New revision" : "New week"}
             </Badge>
           </AlertAction>
         </Alert>
@@ -446,7 +504,7 @@ export function WeeklyUpdateForm({
                     }
                   />
                   <FieldDescription>
-                    Defaults to today. Any date is valid.
+                    Pick the Friday that ends the reporting week. Defaults to today.
                   </FieldDescription>
                   <FieldError>{fieldErrors.weekOf}</FieldError>
                 </FieldContent>
@@ -488,8 +546,7 @@ export function WeeklyUpdateForm({
                     </SelectContent>
                   </Select>
                   <FieldDescription>
-                    Load an existing date to edit it, or start fresh from
-                    today&apos;s date.
+                    Pick a saved week to edit it, or stay on today to start a fresh entry.
                   </FieldDescription>
                 </FieldContent>
               </Field>
@@ -534,25 +591,30 @@ export function WeeklyUpdateForm({
                         <FieldContent>
                           <Input
                             id={field.key}
-                            type="number"
-                            inputMode="decimal"
-                            min={field.min}
-                            max={field.max}
-                            step={field.step}
+                            type="text"
+                            inputMode={field.step < 1 ? "decimal" : "numeric"}
+                            autoComplete="off"
                             value={formState[field.key]}
                             disabled={isAutoCalc}
                             aria-invalid={Boolean(fieldErrors[field.key])}
+                            onKeyDown={makeKeyBlocker(field.step < 1)}
                             onChange={(event) =>
-                              updateNumericField(field.key, event.target.value)
+                              updateNumericField(
+                                field.key,
+                                sanitizeNumericInput(event.target.value, {
+                                  allowDecimal: field.step < 1,
+                                  max: field.max,
+                                }),
+                              )
                             }
                           />
                           <FieldDescription>
                             {field.key === "pipelineVelocity"
-                              ? "Calculated automatically from saved history using pipeline value, close rate, and sales cycle."
+                              ? "Calculated automatically from your saved history. You don't need to fill this in."
                               : field.key === "closeRatePct"
                                 ? isCloseRateAutoCalc
-                                  ? "Calculated automatically from orders won ÷ proposals sent."
-                                  : "Win rate. Auto-fills when proposals sent and orders won are both entered."
+                                  ? "Calculated for you: orders won ÷ proposals sent."
+                                  : "Win rate. Fills in automatically once you enter proposals sent and orders won."
                                 : field.description}
                           </FieldDescription>
                           <FieldError>{fieldErrors[field.key]}</FieldError>
@@ -601,20 +663,22 @@ export function WeeklyUpdateForm({
                                 <FieldContent>
                                   <Input
                                     id={`${metric.stage}-conversion`}
-                                    type="number"
+                                    type="text"
                                     inputMode="decimal"
-                                    min={0}
-                                    max={100}
-                                    step={0.1}
+                                    autoComplete="off"
                                     value={metric.conversionPct}
                                     aria-invalid={Boolean(
                                       fieldErrors[`stageMetrics.${index}.conversionPct`],
                                     )}
+                                    onKeyDown={makeKeyBlocker(true)}
                                     onChange={(event) =>
                                       updateStageMetric(
                                         index,
                                         "conversionPct",
-                                        event.target.value,
+                                        sanitizeNumericInput(event.target.value, {
+                                          allowDecimal: true,
+                                          max: 100,
+                                        }),
                                       )
                                     }
                                   />
@@ -631,20 +695,22 @@ export function WeeklyUpdateForm({
                                 <FieldContent>
                                   <Input
                                     id={`${metric.stage}-days`}
-                                    type="number"
+                                    type="text"
                                     inputMode="decimal"
-                                    min={0}
-                                    max={365}
-                                    step={0.1}
+                                    autoComplete="off"
                                     value={metric.avgDaysInStage}
                                     aria-invalid={Boolean(
                                       fieldErrors[`stageMetrics.${index}.avgDaysInStage`],
                                     )}
+                                    onKeyDown={makeKeyBlocker(true)}
                                     onChange={(event) =>
                                       updateStageMetric(
                                         index,
                                         "avgDaysInStage",
-                                        event.target.value,
+                                        sanitizeNumericInput(event.target.value, {
+                                          allowDecimal: true,
+                                          max: 365,
+                                        }),
                                       )
                                     }
                                   />
@@ -694,13 +760,12 @@ export function WeeklyUpdateForm({
                         ))}
                       </div>
                       <FieldDescription>
-                        Capture the most common reasons deals were lost this
-                        week.
+                        List the top three reasons deals were lost this week.
                       </FieldDescription>
                     </FieldSet>
 
                     <FieldSet>
-                      <FieldLegend>What customers repeatedly ask for</FieldLegend>
+                      <FieldLegend>What customers keep asking for</FieldLegend>
                       <Field
                         data-invalid={Boolean(fieldErrors.repeatedRequests)}
                       >
@@ -721,8 +786,7 @@ export function WeeklyUpdateForm({
                             }
                           />
                           <FieldDescription>
-                            Add the recurring asks you want to track this week,
-                            up to six lines.
+                            One feature request or customer ask per line, up to six.
                           </FieldDescription>
                           <FieldError>{fieldErrors.repeatedRequests}</FieldError>
                         </FieldContent>
@@ -737,8 +801,7 @@ export function WeeklyUpdateForm({
 
         <CardFooter className="flex flex-wrap items-center justify-end gap-3 border-t border-border/60 bg-muted/20">
           <div className="mr-auto text-sm text-muted-foreground">
-            Values are validated on save and stored in durable weekly history
-            with immutable revisions.
+            Values are checked when you save. Earlier saves are kept in history.
           </div>
           {currentStoredSnapshot ? (
             <Dialog>
@@ -779,7 +842,7 @@ export function WeeklyUpdateForm({
           ) : null}
           <Button type="submit" disabled={isSaving}>
             <SaveIcon data-icon="inline-start" />
-            {isSaving ? "Saving..." : "Save snapshot"}
+            {isSaving ? "Saving..." : "Save weekly update"}
           </Button>
         </CardFooter>
       </form>

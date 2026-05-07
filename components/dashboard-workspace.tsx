@@ -1231,8 +1231,8 @@ export function DashboardWorkspace({
               ) : (
                 <EmptyDashboardState
                   icon={LayoutDashboardIcon}
-                  title="No operating overview yet"
-                  description="Save the first weekly report to unlock the latest KPI snapshot, trend charts, and short-term forecast."
+                  title="No data yet"
+                  description="Save your first weekly update to see KPIs, trend charts, and forecasts here."
                   onOpenWeeklyUpdate={() => setActiveView("weekly-update")}
                 />
               )}
@@ -1261,7 +1261,7 @@ export function DashboardWorkspace({
                 <EmptyDashboardState
                   icon={ChartBarIcon}
                   title="No revenue history yet"
-                  description="Save a weekly report to see pipeline value, close rate, coverage, deal size, and revenue momentum."
+                  description="Save a weekly update to track pipeline value, close rate, deal size, and revenue trends."
                   onOpenWeeklyUpdate={() => setActiveView("weekly-update")}
                 />
               )}
@@ -1288,8 +1288,8 @@ export function DashboardWorkspace({
               ) : (
                 <EmptyDashboardState
                   icon={ListIcon}
-                  title="No product-market signals yet"
-                  description="Save a weekly report to track retention, repeated customer requests, and top reasons deals are lost."
+                  title="No customer signals yet"
+                  description="Save a weekly update to track retention, customer requests, and top reasons deals are lost."
                   onOpenWeeklyUpdate={() => setActiveView("weekly-update")}
                 />
               )}
@@ -1312,7 +1312,7 @@ export function DashboardWorkspace({
                 <EmptyDashboardState
                   icon={ShieldCheckIcon}
                   title="No delivery history yet"
-                  description="Save a weekly report to monitor proposals, orders won, feed SLA, and operational incidents."
+                  description="Save a weekly update to track proposals, orders won, service quality, and incidents."
                   onOpenWeeklyUpdate={() => setActiveView("weekly-update")}
                 />
               )}
@@ -1618,12 +1618,12 @@ function ProductSignalSection({
       <div className="grid gap-4 xl:grid-cols-2">
         <RankedSignalsCard
           title="Why deals are lost"
-          description="Aggregated top reasons from the selected trend range."
+          description="Top reasons across all weeks in the selected range."
           items={lossReasonCounts}
         />
         <RankedSignalsCard
-          title="What customers repeatedly ask for"
-          description="Recurring asks normalized across the selected trend range."
+          title="What customers keep asking for"
+          description="Most common requests across all weeks in the selected range."
           items={repeatedRequestCounts}
         />
       </div>
@@ -2645,8 +2645,8 @@ function StageFlowCard({
       <CardHeader className="gap-1.5">
         <CardTitle>Stage flow</CardTitle>
         <CardDescription>
-          Current-stage conversion and average time in stage for the latest
-          snapshot.
+          How well deals convert between stages and how long they sit in each
+          one (latest week only).
         </CardDescription>
       </CardHeader>
       <CardContent>
