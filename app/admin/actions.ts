@@ -93,6 +93,13 @@ function success(message: string): AdminActionState {
 }
 
 function failure(error: unknown): AdminActionState {
+  if (error instanceof z.ZodError) {
+    return {
+      status: "error",
+      message: error.issues[0]?.message ?? "Please check the form and try again.",
+    };
+  }
+
   return {
     status: "error",
     message:
@@ -257,12 +264,16 @@ export async function runSqlQueryAction(
       result,
     };
   } catch (error) {
+    const message =
+      error instanceof z.ZodError
+        ? (error.issues[0]?.message ?? "Please check your input.")
+        : error instanceof Error
+          ? error.message
+          : "The SQL query could not be completed.";
+
     return {
       status: "error",
-      message:
-        error instanceof Error
-          ? error.message
-          : "The SQL query could not be completed.",
+      message,
       result: null,
     };
   }
