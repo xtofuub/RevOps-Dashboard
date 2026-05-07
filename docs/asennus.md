@@ -28,7 +28,7 @@ npm start
 
 Avaa selaimessa:
 
-- `http://localhost:3001/login`
+- `http://localhost:3000/login`
 
 ## Kehitysmoodi
 
