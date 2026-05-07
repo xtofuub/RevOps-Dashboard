@@ -3,6 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import {
+  executeReadonlySqlQuery,
+  getInitialAdminSqlConsoleState,
+} from "@/lib/admin-debug";
+import type { AdminSqlConsoleState } from "@/lib/admin-debug-types";
 import { auth } from "@/lib/auth";
 import {
   createUser,
@@ -54,6 +59,10 @@ const passwordSchema = z.object({
 
 const deleteUserSchema = z.object({
   id: z.string().min(1),
+});
+
+const sqlConsoleSchema = z.object({
+  sql: z.string().trim().min(1, "Enter a SQL query first."),
 });
 
 async function requireAdmin() {
@@ -223,5 +232,38 @@ export async function deleteUserAction(
     return success(`${targetUser.name} was removed.`);
   } catch (error) {
     return failure(error);
+  }
+}
+
+export async function runSqlQueryAction(
+  _previousState: AdminSqlConsoleState = getInitialAdminSqlConsoleState(),
+  formData: FormData,
+): Promise<AdminSqlConsoleState> {
+  void _previousState;
+
+  try {
+    await requireAdmin();
+
+    const payload = sqlConsoleSchema.parse({
+      sql: getString(formData, "sql"),
+    });
+    const result = executeReadonlySqlQuery(payload.sql);
+
+    return {
+      status: "success",
+      message: result.truncated
+        ? `Query ran successfully. Showing the first ${result.rowLimit} rows.`
+        : "Query ran successfully.",
+      result,
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message:
+        error instanceof Error
+          ? error.message
+          : "The SQL query could not be completed.",
+      result: null,
+    };
   }
 }

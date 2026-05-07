@@ -2,27 +2,27 @@
 
 ## What this dashboard is for
 
-The RevOps Dashboard is a weekly operating view for revenue health, retention signals, delivery stability, and customer feedback trends.
+RevOps Dashboard is weekly operating view for revenue health, retention signals, delivery stability, and customer feedback trends.
 
 You use it to:
 
-- review the latest operating snapshot
+- review latest operating snapshot
 - compare recent weeks
-- save or revise a Friday week-ending snapshot
-- export the saved history to Excel
-- check short-term directional estimates for the next 7 days and 30 days
-- manage user accounts when signed in as an admin
+- save or revise Friday week-ending snapshot
+- export saved history to Excel
+- check short-term directional estimates for next 7 days and 30 days
+- manage user accounts when signed in as admin
 
-## Opening the dashboard
+## Opening dashboard
 
-Go to `/dashboard`.
+Go to `/login`, then sign in.
 
-Sign in with the account your admin gave you. For a fresh local development setup, the seeded accounts are:
+For fresh local development setup, seeded accounts are:
 
 - Admin: `admin` / `admin123`
 - User: `user` / `user123`
 
-The main tabs are:
+After sign-in, main tabs are:
 
 - `Overview`
 - `Revenue Engine`
@@ -34,53 +34,58 @@ Admins also see:
 
 - `Admin Panel`
 
-Clicking `Admin Panel` in the left sidebar opens account management on the right side of the same dashboard. The browser stays on `/dashboard`.
+Clicking `Admin Panel` in left sidebar opens admin tools inside same dashboard. Browser stays on `/dashboard`.
 
 ## Admin Panel
 
-The admin panel is visible only to admin users.
+Admin panel visible only to admin users.
 
 Admins can:
 
 - create user accounts
 - delete user accounts
-- edit a user's display name
-- change a user's role between `Admin` and `User`
-- reset a user's password
+- edit user display name
+- change user role between `Admin` and `User`
+- reset user password
+- inspect real backend tables from frontend
+- review saved weekly report history and recent saved versions
+- run read-only SQL queries with preset examples
 
 Safety rules:
 
-- You cannot delete the account you are currently using.
-- The dashboard keeps at least one admin account available.
+- You cannot delete account you are currently using.
+- Dashboard keeps at least one admin account available.
 - Password changes apply immediately.
-- User account records are stored locally for the running environment.
+- User account records are stored locally for running environment.
+- SQL console blocks write queries and only allows read-only single-statement queries.
 
-## Saving a weekly snapshot
+## Saving weekly snapshot
 
-Open the `Weekly Update` tab.
+Open `Weekly Update` tab.
 
 ### Recommended workflow
 
-1. Pick the Friday that ends the reporting week.
-2. Use `Load from saved week` if you want to start from an existing snapshot.
-3. Update the KPI fields for that reporting week.
-4. Fill in the top 3 loss reasons.
+1. Pick Friday that ends reporting week.
+2. Use `Load from saved week` if you want to start from existing snapshot.
+3. Update KPI fields for that reporting week.
+4. Fill top 3 loss reasons.
 5. Add repeated customer requests, one request per line.
-6. Review the stage flow values.
+6. Review stage flow values.
 7. Click `Save weekly snapshot`.
 
 ### Important rules
 
 - Use one snapshot per Friday week-ending date.
-- If you save the same Friday again, the dashboard creates a new revision.
-- The latest revision becomes the active version shown in the dashboard.
-- Earlier revisions are kept in history.
+- If you save same Friday again, dashboard creates new saved version instead of overwriting old one.
+- Latest saved version becomes active version shown in dashboard.
+- Earlier saved versions stay in history.
+- Admins can see who saved each version from backend view.
 
 ## Why pipeline velocity is automatic
 
-`Pipeline velocity` is now calculated for you.
+`Pipeline velocity` now calculated for you.
 
-That field updates automatically from:
+Field updates automatically from:
 
 - pipeline value
 - close rate
@@ -89,20 +94,20 @@ That field updates automatically from:
 
 You do not need to type it manually.
 
-## Why the browser showed “Please select a valid value”
+## Why browser showed "Please select a valid value"
 
-That popup comes from the browser’s number input validation.
+That popup comes from browser number input validation.
 
-It appears when the typed number does not match the field’s allowed increment size. For example:
+It appears when typed number does not match field allowed increment size. Example:
 
-- a field using `step=50` rejects `3720`
-- a field using `step=1000` rejects `28100`
+- field using `step=50` rejects `3720`
+- field using `step=1000` rejects `28100`
 
-The dashboard now uses a friendlier step for customer acquisition cost, and pipeline velocity is auto-calculated instead of manually typed.
+Dashboard now uses friendlier step for customer acquisition cost, and pipeline velocity is auto-calculated instead of manually typed.
 
-## Using the forecast
+## Using forecast
 
-The `Overview` tab includes a `Forward estimate` card.
+`Overview` tab includes `Forward estimate` card.
 
 It shows:
 
@@ -110,7 +115,7 @@ It shows:
 - projected `+7d` value
 - projected `+30d` value
 
-Use these estimates as a directional signal, not a guaranteed outcome.
+Use estimates as directional signal, not guaranteed outcome.
 
 Best use cases:
 
@@ -120,19 +125,19 @@ Best use cases:
 
 ## Trend range controls
 
-Outside the `Weekly Update` tab, the dashboard range controls affect charts and ranked tables.
+Outside `Weekly Update` tab, dashboard range controls affect charts and ranked tables.
 
 You can view:
 
 - last 7 days
 - last 30 days
-- a custom week-ending range
+- custom week-ending range
 
 ## Exporting data
 
-The dashboard supports Excel export through the weekly snapshot export route.
+Dashboard supports Excel export through weekly snapshot export route.
 
-If export is wired to a button in your current build, use that button. Otherwise the export endpoint is:
+If export is wired to button in your current build, use that button. Otherwise export endpoint is:
 
 - `/api/export/weekly-snapshots`
 
@@ -140,20 +145,28 @@ If export is wired to a button in your current build, use that button. Otherwise
 
 - Keep loss reasons short and specific.
 - Enter repeated requests consistently so trends stay readable week to week.
-- Use the same interpretation of each KPI every week.
-- Prefer revising the same Friday snapshot instead of creating duplicate weeks.
+- Use same interpretation of each KPI every week.
+- Prefer revising same Friday snapshot instead of creating duplicate weeks.
 
 ## If something looks wrong
 
 Check these first:
 
-- Is the `weekOf` date a Friday?
-- Did you accidentally load the wrong saved week as a template?
-- Are you reviewing the correct trend range?
-- Did you save a new revision for an existing week?
+- Is `weekOf` date Friday?
+- Did you accidentally load wrong saved week as template?
+- Are you reviewing correct trend range?
+- Did you save new revision for existing week?
 
-If the data still looks off, ask a developer to inspect:
+If data still looks off, ask developer to inspect:
 
 - `/api/weekly-snapshots`
 - `/api/weekly-snapshots/[weekOf]/revisions`
-- the SQLite database in `data/revops-dashboard.db`
+- SQLite database in `data/revops-dashboard.db`
+
+## What backend tables mean
+
+Admins may see these table names in backend viewer or SQL console:
+
+- `workspaces` = dashboard workspace record. In this app usually one row.
+- `snapshots` = one row per reporting week. Points to current live saved version for that week.
+- `snapshot_revisions` = every saved version for every reporting week, including who saved it and when.

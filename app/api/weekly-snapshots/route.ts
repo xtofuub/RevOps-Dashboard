@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { buildDashboardForecast } from "@/lib/dashboard-forecast";
 import { deleteWeeklySnapshot, readWeeklySnapshots, upsertWeeklySnapshot } from "@/lib/dashboard-store";
+import { auth } from "@/lib/auth";
 import { buildDashboardData, weeklySnapshotPayloadSchema } from "@/lib/kpi-dashboard";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,15 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const session = await auth();
+
+    if (!session?.user) {
+      return NextResponse.json(
+        { message: "You must be signed in to save weekly snapshots." },
+        { status: 401 },
+      );
+    }
+
     const payload = await request.json();
     const parsedPayload = weeklySnapshotPayloadSchema.safeParse(payload);
 
@@ -54,7 +64,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await upsertWeeklySnapshot(parsedPayload.data);
+    const result = await upsertWeeklySnapshot(parsedPayload.data, {
+      authorLabel: `${session.user.name} (@${session.user.username})`,
+    });
 
     return NextResponse.json(result);
   } catch (error) {

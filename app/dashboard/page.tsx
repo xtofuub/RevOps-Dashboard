@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { auth, getAllUsers } from "@/lib/auth"
+import { buildAdminDebugData } from "@/lib/admin-debug"
 import { DashboardWorkspace } from "@/components/dashboard-workspace"
 import { buildDashboardForecast } from "@/lib/dashboard-forecast"
 import { readWeeklySnapshots } from "@/lib/dashboard-store"
@@ -18,6 +19,8 @@ export default async function DashboardPage() {
   const dashboard = buildDashboardData(snapshots)
   const forecast = buildDashboardForecast(snapshots)
   const users = session.user.role === "admin" ? getAllUsers() : []
+  const adminDebugData =
+    session.user.role === "admin" ? buildAdminDebugData() : null
 
   return (
     <DashboardWorkspace
@@ -25,6 +28,7 @@ export default async function DashboardPage() {
       dashboard={dashboard}
       forecast={forecast}
       users={users}
+      adminDebugData={adminDebugData}
       user={session.user}
     />
   )

@@ -11,6 +11,16 @@ import { sampleSnapshot, sampleSnapshotPayload } from "@/tests/fixtures";
 let tempDirectory = "";
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/auth", () => ({
+  auth: vi.fn(async () => ({
+    user: {
+      id: "1",
+      username: "admin",
+      name: "Admin User",
+      role: "admin",
+    },
+  })),
+}));
 
 async function loadModules() {
   const dbModule = await import("@/lib/dashboard-db");
@@ -86,6 +96,7 @@ describe("weekly snapshots api", () => {
 
     expect(revisionsResponse.status).toBe(200);
     expect(revisionsBody.revisions).toHaveLength(2);
+    expect(revisionsBody.revisions[0]?.authorLabel).toBe("Admin User (@admin)");
     expect(revisionsBody.revisions[0]?.snapshot.closeRatePct).toBe(26);
     expect(revisionsBody.revisions[1]?.snapshot.closeRatePct).toBe(25);
   });

@@ -75,6 +75,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import type { AdminDebugData } from "@/lib/admin-debug-types";
 import {
   ADMIN_VIEW_ID,
   type WorkspaceView,
@@ -109,6 +110,7 @@ type DashboardWorkspaceProps = {
   dashboard: DashboardData;
   forecast: DashboardForecast | null;
   users: PublicUser[];
+  adminDebugData: AdminDebugData | null;
   user: { id: string; username: string; name: string; role: string };
 };
 
@@ -730,6 +732,7 @@ export function DashboardWorkspace({
   dashboard,
   forecast,
   users,
+  adminDebugData,
   user,
 }: DashboardWorkspaceProps) {
   const [activeView, setActiveView] = React.useState<WorkspaceView>("overview");
@@ -919,21 +922,6 @@ export function DashboardWorkspace({
       : predictionMode === "30d"
         ? "Charts extend through the next 4 forecast weeks."
         : null;
-
-  const summarySentence = latestSnapshot
-    ? `Week ending ${formatWeekLabelWithYear(
-        latestSnapshot.weekOf,
-      )} closed at ${formatMetricByKey(
-        "closeRatePct",
-        latestSnapshot.closeRatePct,
-      )}, ${formatMetricByKey(
-        "pipelineCoverageRatio",
-        latestSnapshot.pipelineCoverageRatio,
-      )} coverage, and ${formatMetricByKey(
-        "feedRetentionPct",
-        latestSnapshot.feedRetentionPct,
-      )} feed retention.`
-    : "No weekly snapshots have been saved yet.";
 
   return (
     <SidebarProvider
@@ -1220,20 +1208,6 @@ export function DashboardWorkspace({
             <TabsContent value="overview" className="flex flex-col gap-6">
               {hasData ? (
                 <>
-                  <Card className="border-border bg-card shadow-none">
-                    <CardHeader className="gap-3">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="flex flex-col gap-1">
-                          <CardTitle>Operating signal</CardTitle>
-                          <CardDescription>{summarySentence}</CardDescription>
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          Week ending {formatWeekLabelWithYear(latestSnapshot!.weekOf)}
-                        </div>
-                      </div>
-                    </CardHeader>
-                  </Card>
-
                   {activeForecast && predictionMode !== "off" ? (
                     <ForecastCard
                       forecast={activeForecast}
@@ -1255,7 +1229,12 @@ export function DashboardWorkspace({
                   />
                 </>
               ) : (
-                <EmptyDashboardState onOpenWeeklyUpdate={() => setActiveView("weekly-update")} />
+                <EmptyDashboardState
+                  icon={LayoutDashboardIcon}
+                  title="No operating overview yet"
+                  description="Save the first weekly report to unlock the latest KPI snapshot, trend charts, and short-term forecast."
+                  onOpenWeeklyUpdate={() => setActiveView("weekly-update")}
+                />
               )}
             </TabsContent>
 
@@ -1279,7 +1258,12 @@ export function DashboardWorkspace({
                   />
                 </>
               ) : (
-                <EmptyDashboardState onOpenWeeklyUpdate={() => setActiveView("weekly-update")} />
+                <EmptyDashboardState
+                  icon={ChartBarIcon}
+                  title="No revenue history yet"
+                  description="Save a weekly report to see pipeline value, close rate, coverage, deal size, and revenue momentum."
+                  onOpenWeeklyUpdate={() => setActiveView("weekly-update")}
+                />
               )}
             </TabsContent>
 
@@ -1302,7 +1286,12 @@ export function DashboardWorkspace({
                   />
                 </>
               ) : (
-                <EmptyDashboardState onOpenWeeklyUpdate={() => setActiveView("weekly-update")} />
+                <EmptyDashboardState
+                  icon={ListIcon}
+                  title="No product-market signals yet"
+                  description="Save a weekly report to track retention, repeated customer requests, and top reasons deals are lost."
+                  onOpenWeeklyUpdate={() => setActiveView("weekly-update")}
+                />
               )}
             </TabsContent>
 
@@ -1320,7 +1309,12 @@ export function DashboardWorkspace({
                     />
                 </>
               ) : (
-                <EmptyDashboardState onOpenWeeklyUpdate={() => setActiveView("weekly-update")} />
+                <EmptyDashboardState
+                  icon={ShieldCheckIcon}
+                  title="No delivery history yet"
+                  description="Save a weekly report to monitor proposals, orders won, feed SLA, and operational incidents."
+                  onOpenWeeklyUpdate={() => setActiveView("weekly-update")}
+                />
               )}
             </TabsContent>
 
@@ -1333,6 +1327,7 @@ export function DashboardWorkspace({
                 <AdminPanel
                   users={users}
                   currentUser={user}
+                  debugData={adminDebugData}
                   variant="workspace"
                 />
               </TabsContent>
@@ -1345,9 +1340,15 @@ export function DashboardWorkspace({
 }
 
 function EmptyDashboardState({
+  description,
+  icon: Icon,
   onOpenWeeklyUpdate,
+  title,
 }: {
+  description: string;
+  icon: React.ComponentType;
   onOpenWeeklyUpdate: () => void;
+  title: string;
 }) {
   return (
     <Card className="border-border bg-card shadow-none">
@@ -1355,13 +1356,10 @@ function EmptyDashboardState({
         <Empty className="min-h-[22rem] border border-dashed border-border bg-background">
           <EmptyHeader>
             <EmptyMedia variant="icon">
-              <LayoutDashboardIcon />
+              <Icon />
             </EmptyMedia>
-            <EmptyTitle>No weekly history yet</EmptyTitle>
-            <EmptyDescription>
-              Save the first weekly snapshot to unlock trends, ranked signals,
-              and delivery monitoring.
-            </EmptyDescription>
+            <EmptyTitle>{title}</EmptyTitle>
+            <EmptyDescription>{description}</EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
             <button
@@ -1423,34 +1421,38 @@ function MetricCard({
         : ArrowDownRightIcon;
 
   return (
-    <Card className="border-border bg-card shadow-none">
-      <CardHeader className="gap-4">
-        <div className="flex items-start justify-between gap-3">
+    <Card className="h-full min-h-[10.75rem] border-border bg-card shadow-none">
+      <CardHeader className="flex h-full flex-col gap-4 p-5">
+        <div className="flex min-h-10 items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-muted">
-              <Icon />
+              <Icon className="size-5" />
             </div>
             <div className="min-w-0">
-              <CardDescription>{field.shortLabel}</CardDescription>
-              <CardTitle className="mt-1 text-xl">
+              <CardDescription className="truncate text-xs">
+                {field.shortLabel}
+              </CardDescription>
+              <CardTitle className="mt-1 truncate text-xl leading-none">
                 {formatMetricByKey(metricKey, latestValue)}
               </CardTitle>
             </div>
           </div>
         </div>
-        <div className="flex flex-col gap-1">
-          <p className="text-sm text-muted-foreground">{field.description}</p>
+        <div className="mt-auto flex flex-1 flex-col justify-end gap-2">
+          <p className="min-h-10 text-sm leading-5 text-muted-foreground">
+            {field.description}
+          </p>
           <div
             className={cn(
-              "flex items-center gap-2 text-sm",
+              "flex min-h-5 items-center gap-2 whitespace-nowrap text-sm",
               comparison.tone === "positive" &&
                 "text-emerald-600 dark:text-emerald-400",
               comparison.tone === "negative" && "text-rose-600 dark:text-rose-400",
               comparison.tone === "neutral" && "text-muted-foreground",
             )}
           >
-            {DeltaIcon ? <DeltaIcon className="size-4" /> : null}
-            <span>{comparison.longText}</span>
+            {DeltaIcon ? <DeltaIcon className="size-4 shrink-0" /> : null}
+            <span className="truncate">{comparison.longText}</span>
           </div>
         </div>
       </CardHeader>

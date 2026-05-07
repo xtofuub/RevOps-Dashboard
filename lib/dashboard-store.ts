@@ -3,8 +3,6 @@ import "server-only";
 import {
   createSnapshotRevision,
   deleteSnapshot,
-  listAlertSubscriptions,
-  listMetricTargets,
   listSnapshotRevisions,
   listWeeklySnapshots,
 } from "@/lib/dashboard-db";
@@ -17,13 +15,19 @@ export async function readWeeklySnapshots() {
   return listWeeklySnapshots();
 }
 
-export async function upsertWeeklySnapshot(payload: WeeklySnapshotPayload) {
+export async function upsertWeeklySnapshot(
+  payload: WeeklySnapshotPayload,
+  options?: { authorLabel?: string },
+) {
   const history = listWeeklySnapshots();
 
-  return createSnapshotRevision({
-    ...payload,
-    pipelineVelocity: calculatePipelineVelocity(payload, history),
-  });
+  return createSnapshotRevision(
+    {
+      ...payload,
+      pipelineVelocity: calculatePipelineVelocity(payload, history),
+    },
+    options,
+  );
 }
 
 export async function deleteWeeklySnapshot(weekOf: string) {
@@ -32,12 +36,4 @@ export async function deleteWeeklySnapshot(weekOf: string) {
 
 export async function readSnapshotRevisions(weekOf: string) {
   return listSnapshotRevisions(weekOf);
-}
-
-export async function readMetricTargets() {
-  return listMetricTargets();
-}
-
-export async function readAlertSubscriptions() {
-  return listAlertSubscriptions();
 }

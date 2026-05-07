@@ -10,42 +10,46 @@
 - Local JSON user store with bcrypt password hashes
 - Vitest for tests
 
-Before changing framework behavior, read the relevant local Next.js docs in `node_modules/next/dist/docs/`.
+Before changing framework behavior, read relevant local Next.js docs in `node_modules/next/dist/docs/`.
 
 ## High-level architecture
 
 ### App routes
 
 - `app/dashboard/page.tsx`
-  - Server component that loads snapshots, dashboard data, forecast data, and admin users when the current session is admin.
+  - Server component that loads snapshots, dashboard data, forecast data, and admin users when current session is admin.
 - `app/admin/page.tsx`
-  - Direct admin route for account management. The same admin panel is also rendered inside `/dashboard` as an admin-only workspace view.
+  - Direct admin route for account management. Same admin panel also rendered inside `/dashboard` as admin-only workspace view.
 - `app/admin/actions.ts`
-  - Server actions for creating users, updating roles/names, resetting passwords, and deleting accounts.
+  - Server actions for creating users, updating roles/names, resetting passwords, deleting accounts, and running guarded read-only SQL queries.
 - `app/api/weekly-snapshots/route.ts`
-  - `GET` returns the timeline, dashboard summary, and forecast.
-  - `POST` validates a snapshot payload and stores a new revision.
+  - `GET` returns timeline, dashboard summary, and forecast.
+  - `POST` validates snapshot payload and stores new revision with signed-in user label when available.
 - `app/api/weekly-snapshots/[weekOf]/revisions/route.ts`
-  - Returns revision history for a saved week.
+  - Returns revision history for saved week.
 - `app/api/export/weekly-snapshots/route.ts`
-  - Builds and downloads the Excel workbook.
+  - Builds and downloads Excel workbook.
 
 ### Core libraries
 
 - `lib/kpi-dashboard.ts`
   - Source of truth for metric metadata, snapshot schemas, formatting helpers, and dashboard summary builders.
 - `lib/dashboard-forecast.ts`
-  - Produces directional `+7d` and `+30d` projections from the latest saved weekly history.
+  - Produces directional `+7d` and `+30d` projections from latest saved weekly history.
 - `lib/dashboard-db.ts`
-  - Owns SQLite schema creation, migration from legacy JSON, and revision persistence.
+  - Owns SQLite schema creation, migration from legacy JSON, revision persistence, and unused seed table cleanup.
 - `lib/dashboard-store.ts`
-  - Thin server-only adapter around the DB layer.
+  - Thin server-only adapter around DB layer.
 - `lib/auth.ts`
-  - Reads the `session` cookie, resolves it against the local user store, and returns the current user.
+  - Reads `session` cookie, resolves it against local user store, and returns current user.
 - `lib/user-store.ts`
-  - Server-only JSON-backed account store. Seeds default local accounts, hashes passwords with bcrypt, and protects the final admin account.
+  - Server-only JSON-backed account store. Seeds default local accounts, hashes passwords with bcrypt, protects final admin account.
 - `lib/dashboard-navigation.ts`
-  - Shared workspace view metadata for dashboard tabs and the admin panel view.
+  - Shared workspace view metadata for dashboard tabs and admin panel view.
+- `lib/admin-debug.ts`
+  - Builds admin-only backend inspection data, table previews, counts, and recent revision summaries.
+- `lib/admin-debug-types.ts`
+  - Shared types for admin backend viewer and SQL console results.
 - `lib/export-weekly-dashboard.ts`
   - Excel export builder.
 - `lib/weekly-snapshot-csv.ts`
@@ -54,77 +58,88 @@ Before changing framework behavior, read the relevant local Next.js docs in `nod
 ### Main UI files
 
 - `components/dashboard-workspace.tsx`
-  - Dashboard views, charts, tables, range controls, forecast card, and the admin workspace view.
+  - Dashboard views, charts, tables, range controls, forecast card, empty states, and admin workspace view.
 - `components/app-sidebar.tsx`
-  - Left navigation. Shows the `Admin Panel` item only when `user.role === "admin"`.
+  - Left navigation. Shows `Admin Panel` item only when `user.role === "admin"`.
 - `components/site-header.tsx`
-  - Header metadata for the active workspace view.
+  - Header metadata for active workspace view.
 - `components/weekly-update-form.tsx`
   - Weekly snapshot form, validation UX, and derived field preview for pipeline velocity.
 
 ## Authentication and admin accounts
 
-Authentication is intentionally lightweight for local/internal use.
+Authentication intentionally lightweight for local/internal use.
 
 - Login submits to `app/login/actions.ts`.
-- Credentials are verified by `verifyUserCredentials()` in `lib/user-store.ts`.
-- The app stores an HTTP-only `session` cookie containing the user id, username, and role.
-- `auth()` always resolves the cookie against `data/users.json`, so deleted or changed users stop matching stale cookie data.
+- Credentials verified by `verifyUserCredentials()` in `lib/user-store.ts`.
+- App stores HTTP-only `session` cookie containing user id, username, and role.
+- `auth()` always resolves cookie against `data/users.json`, so deleted or changed users stop matching stale cookie data.
 
-Default accounts are created the first time the local user store is initialized:
+Default accounts created first time local user store initializes:
 
 - `admin` / `admin123`
 - `user` / `user123`
 
-The admin panel supports:
+Admin panel supports:
 
 - Create user accounts
 - Edit display name and role
 - Reset passwords
 - Delete users
-- Prevent deleting or demoting the final admin
+- Prevent deleting or demoting final admin
+- Inspect backend table previews from frontend
+- Review snapshot and revision history with human-readable labels
+- Run read-only SQL queries through guarded presets or custom `SELECT` / read-only `PRAGMA` statements
 
-The canonical local user file is `data/users.json`. It is ignored by git because it contains environment-specific account records and password hashes.
+Canonical local user file is `data/users.json`. It is ignored by git because it contains environment-specific account records and password hashes.
 
 ## Data model
 
-The database stores one logical snapshot per `workspace_id + week_of`, but each save creates a revision.
+Database stores one logical snapshot per `workspace_id + week_of`, but each save creates revision.
 
 ### Tables
 
 - `workspaces`
 - `snapshots`
 - `snapshot_revisions`
-- `metric_targets`
-- `alert_subscriptions`
+
+### Table meaning
+
+- `workspaces`
+  - Workspace metadata. App currently runs as single workspace in practice.
+- `snapshots`
+  - One row per reporting week. `latest_revision_id` points to currently visible saved version.
+- `snapshot_revisions`
+  - Immutable saved versions for each week. Stores payload JSON, revision number, author label, and timestamp.
 
 ### Snapshot behavior
 
-- The visible timeline always shows the latest revision for each week.
-- Saving an existing `weekOf` does not destroy prior versions.
-- Revision history is available through the revisions API route.
+- Visible timeline always shows latest revision for each week.
+- Saving existing `weekOf` does not destroy prior versions.
+- Revision history available through revisions API route.
+- Each revision stores `author_label` so admins can see who last saved each weekly version.
 
 ## Derived metric behavior
 
 ### Pipeline velocity
 
-`pipelineVelocity` is no longer treated as a manually curated field in the form.
+`pipelineVelocity` no longer treated as manually curated field in form.
 
 How it works:
 
-1. The form watches `pipelineValue`, `salesCycleDays`, and `closeRatePct`.
-2. `calculatePipelineVelocity()` in `lib/kpi-dashboard.ts` uses saved history to fit a lightweight regression model.
-3. If there is not enough history for regression, it falls back to a median historical scale factor.
-4. The server recalculates `pipelineVelocity` before persistence, so the saved value stays consistent even if a caller posts a manual number.
+1. Form watches `pipelineValue`, `salesCycleDays`, and `closeRatePct`.
+2. `calculatePipelineVelocity()` in `lib/kpi-dashboard.ts` uses saved history to fit lightweight regression model.
+3. If not enough history for regression, it falls back to median historical scale factor.
+4. Server recalculates `pipelineVelocity` before persistence, so saved value stays consistent even if caller posts manual number.
 
 Why this exists:
 
-- It removes a repetitive manual input.
-- It keeps new snapshots aligned with the historical pattern already saved in the dashboard.
+- Removes repetitive manual input.
+- Keeps new snapshots aligned with historical pattern already saved in dashboard.
 
 ## Forecast behavior
 
-`buildDashboardForecast()` projects a directional estimate for selected metrics:
+`buildDashboardForecast()` projects directional estimate for selected metrics:
 
 - `pipelineValue`
 - `pipelineVelocity`
@@ -134,12 +149,12 @@ Why this exists:
 
 Implementation details:
 
-- Uses the latest 12 saved weekly snapshots
-- Fits a simple linear trend by time index for each metric
+- Uses latest 12 saved weekly snapshots
+- Fits simple linear trend by time index for each metric
 - Projects one week ahead (`+7d`) and roughly 30 days ahead (`+30d`)
-- Clamps values to the metric bounds from `metricFieldMap`
+- Clamps values to metric bounds from `metricFieldMap`
 
-This is intentionally lightweight and explainable. It is meant for operational planning, not financial commitment.
+This intentionally lightweight and explainable. Meant for operational planning, not financial commitment.
 
 ## Local development
 
@@ -148,9 +163,9 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000/dashboard`.
+Open `http://localhost:3000/login`.
 
-If you are testing from another device or VM through a LAN address such as `http://10.5.0.2:3000/dashboard`, `next.config.ts` derives `allowedDevOrigins` from local IPv4 interfaces so development HMR requests are accepted.
+If testing from another device or VM through LAN address such as `http://10.5.0.2:3000/dashboard`, `next.config.ts` derives `allowedDevOrigins` from local IPv4 interfaces so development HMR requests are accepted.
 
 ## Build, lint, test
 
@@ -175,22 +190,22 @@ REVOPS_DASHBOARD_DB_PATH=/custom/path/revops-dashboard.db
 REVOPS_LEGACY_SNAPSHOT_PATH=/custom/path/weekly-metrics.json
 ```
 
-The tests use these environment variables to isolate temporary databases.
+Tests use these environment variables to isolate temporary databases.
 
 ## Common maintenance tasks
 
-### Add or change a metric
+### Add or change metric
 
-1. Update the metric schema and metadata in `lib/kpi-dashboard.ts`.
-2. Update any chart or card usage in `components/dashboard-workspace.tsx`.
-3. Update the weekly form in `components/weekly-update-form.tsx` if the metric is editable.
+1. Update metric schema and metadata in `lib/kpi-dashboard.ts`.
+2. Update chart or card usage in `components/dashboard-workspace.tsx`.
+3. Update weekly form in `components/weekly-update-form.tsx` if metric editable.
 4. Update tests and docs.
 
 ### Change forecast behavior
 
 1. Edit `lib/dashboard-forecast.ts`.
-2. Keep the model explainable and bounded.
-3. Update user-facing wording if the interpretation changes.
+2. Keep model explainable and bounded.
+3. Update user-facing wording if interpretation changes.
 4. Add or update tests in `lib/dashboard-forecast.test.ts`.
 
 ### Change revision storage
@@ -198,18 +213,19 @@ The tests use these environment variables to isolate temporary databases.
 1. Start in `lib/dashboard-db.ts`.
 2. Preserve migration safety from `data/weekly-metrics.json`.
 3. Keep `listWeeklySnapshots()` returning only latest revisions.
-4. Keep the revisions route contract intact.
+4. Keep revisions route contract intact.
 
 ### Change admin behavior
 
-1. Keep mutations in `app/admin/actions.ts` so every account change re-checks the server-side admin session.
+1. Keep mutations in `app/admin/actions.ts` so every account change re-checks server-side admin session.
 2. Keep local account persistence in `lib/user-store.ts`.
-3. Keep the in-dashboard view wired through `lib/dashboard-navigation.ts`, `components/app-sidebar.tsx`, and `components/dashboard-workspace.tsx`.
-4. Revalidate both `/admin` and `/dashboard` after account mutations so the direct route and workspace view stay fresh.
+3. Keep in-dashboard view wired through `lib/dashboard-navigation.ts`, `components/app-sidebar.tsx`, and `components/dashboard-workspace.tsx`.
+4. Revalidate both `/admin` and `/dashboard` after account mutations so direct route and workspace view stay fresh.
+5. Keep SQL guardrails aligned between `app/admin/actions.ts` and `lib/admin-debug.ts` if query capabilities change.
 
 ## Known constraints
 
-- The dashboard is currently single-workspace in practice, even though the DB schema supports workspaces.
-- The user store is local JSON, not a production identity provider.
-- The main dashboard component is still large. Prefer extracting helper cards or sections instead of adding more inline complexity.
-- Some legacy helper files may exist before a UI is fully wired. Confirm usage before removing them.
+- Dashboard currently single-workspace in practice, even though DB schema supports workspaces.
+- User store is local JSON, not production identity provider.
+- Main dashboard component still large. Prefer extracting helper cards or sections instead of adding more inline complexity.
+- Some legacy helper files may exist before UI fully wired. Confirm usage before removing them.

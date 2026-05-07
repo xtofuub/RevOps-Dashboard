@@ -12,13 +12,6 @@ import {
   type WeeklySnapshot,
   type WeeklySnapshotPayload,
 } from "@/lib/kpi-dashboard";
-import {
-  defaultAlertSubscriptions,
-  getDefaultMetricTargets,
-  type AlertSubscription,
-  type MetricTarget,
-  type ThresholdDirection,
-} from "@/lib/dashboard-ops";
 
 const dataDirectoryPath = path.join(/* turbopackIgnore: true */ process.cwd(), "data");
 function getDatabaseFilePath() {
@@ -66,10 +59,9 @@ function getDatabase() {
   instance.pragma("journal_mode = WAL");
   instance.pragma("foreign_keys = ON");
   initializeSchema(instance);
+  dropUnusedSeedTables(instance);
   seedDefaultWorkspace(instance);
   migrateLegacySnapshots(instance);
-  seedMetricTargets(instance);
-  seedAlertSubscriptions(instance);
   database = instance;
   return instance;
 }
@@ -107,38 +99,19 @@ function initializeSchema(db: Database.Database) {
       FOREIGN KEY (snapshot_id) REFERENCES snapshots(id) ON DELETE CASCADE
     );
 
-    CREATE TABLE IF NOT EXISTS metric_targets (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      workspace_id INTEGER NOT NULL,
-      metric_key TEXT NOT NULL,
-      owner_name TEXT NOT NULL,
-      target_value REAL NOT NULL,
-      threshold_value REAL NOT NULL,
-      threshold_direction TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      UNIQUE(workspace_id, metric_key),
-      FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS alert_subscriptions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      workspace_id INTEGER NOT NULL,
-      metric_key TEXT NOT NULL,
-      recipient TEXT NOT NULL,
-      channel TEXT NOT NULL,
-      is_enabled INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
-    );
-
     CREATE INDEX IF NOT EXISTS idx_snapshots_workspace_week
       ON snapshots(workspace_id, week_of);
     CREATE INDEX IF NOT EXISTS idx_snapshot_revisions_snapshot_revision
       ON snapshot_revisions(snapshot_id, revision_number DESC);
-    CREATE INDEX IF NOT EXISTS idx_metric_targets_workspace
-      ON metric_targets(workspace_id);
-    CREATE INDEX IF NOT EXISTS idx_alert_subscriptions_workspace
-      ON alert_subscriptions(workspace_id);
+  `);
+}
+
+function dropUnusedSeedTables(db: Database.Database) {
+  db.exec(`
+    DROP INDEX IF EXISTS idx_alert_subscriptions_workspace;
+    DROP TABLE IF EXISTS alert_subscriptions;
+    DROP INDEX IF EXISTS idx_metric_targets_workspace;
+    DROP TABLE IF EXISTS metric_targets;
   `);
 }
 
@@ -241,99 +214,6 @@ function migrateLegacySnapshots(db: Database.Database) {
   });
 
   migrate();
-}
-
-function seedMetricTargets(db: Database.Database) {
-  const workspaceId = getWorkspaceId(db);
-  const row = db
-    .prepare("SELECT COUNT(*) AS count FROM metric_targets WHERE workspace_id = ?")
-    .get(workspaceId) as { count: number };
-
-  if (row.count > 0) {
-    return;
-  }
-
-  const insertTarget = db.prepare(`
-    INSERT INTO metric_targets (
-      workspace_id,
-      metric_key,
-      owner_name,
-      target_value,
-      threshold_value,
-      threshold_direction,
-      updated_at
-    ) VALUES (
-      @workspace_id,
-      @metric_key,
-      @owner_name,
-      @target_value,
-      @threshold_value,
-      @threshold_direction,
-      @updated_at
-    )
-  `);
-
-  const seed = db.transaction(() => {
-    for (const target of getDefaultMetricTargets()) {
-      insertTarget.run({
-        workspace_id: workspaceId,
-        metric_key: target.metricKey,
-        owner_name: target.ownerName,
-        target_value: target.targetValue,
-        threshold_value: target.thresholdValue,
-        threshold_direction: target.thresholdDirection,
-        updated_at: target.updatedAt,
-      });
-    }
-  });
-
-  seed();
-}
-
-function seedAlertSubscriptions(db: Database.Database) {
-  const workspaceId = getWorkspaceId(db);
-  const row = db
-    .prepare(
-      "SELECT COUNT(*) AS count FROM alert_subscriptions WHERE workspace_id = ?",
-    )
-    .get(workspaceId) as { count: number };
-
-  if (row.count > 0) {
-    return;
-  }
-
-  const insertSubscription = db.prepare(`
-    INSERT INTO alert_subscriptions (
-      workspace_id,
-      metric_key,
-      recipient,
-      channel,
-      is_enabled,
-      created_at
-    ) VALUES (
-      @workspace_id,
-      @metric_key,
-      @recipient,
-      @channel,
-      @is_enabled,
-      @created_at
-    )
-  `);
-
-  const seed = db.transaction(() => {
-    for (const subscription of defaultAlertSubscriptions) {
-      insertSubscription.run({
-        workspace_id: workspaceId,
-        metric_key: subscription.metricKey,
-        recipient: subscription.recipient,
-        channel: subscription.channel,
-        is_enabled: subscription.isEnabled ? 1 : 0,
-        created_at: subscription.createdAt,
-      });
-    }
-  });
-
-  seed();
 }
 
 function parseSnapshot(json: string) {
@@ -482,63 +362,6 @@ export function createSnapshotRevision(
   });
 
   return createOrUpdateSnapshot();
-}
-
-export function listMetricTargets() {
-  const db = getDatabase();
-  const workspaceId = getWorkspaceId(db);
-  const rows = db
-    .prepare(`
-      SELECT metric_key, owner_name, target_value, threshold_value,
-        threshold_direction, updated_at
-      FROM metric_targets
-      WHERE workspace_id = ?
-      ORDER BY metric_key ASC
-    `)
-    .all(workspaceId) as Array<{
-    metric_key: MetricTarget["metricKey"];
-    owner_name: string;
-    target_value: number;
-    threshold_value: number;
-    threshold_direction: ThresholdDirection;
-    updated_at: string;
-  }>;
-
-  return rows.map<MetricTarget>((row) => ({
-    metricKey: row.metric_key,
-    ownerName: row.owner_name,
-    targetValue: row.target_value,
-    thresholdValue: row.threshold_value,
-    thresholdDirection: row.threshold_direction,
-    updatedAt: row.updated_at,
-  }));
-}
-
-export function listAlertSubscriptions() {
-  const db = getDatabase();
-  const workspaceId = getWorkspaceId(db);
-  const rows = db
-    .prepare(`
-      SELECT metric_key, recipient, channel, is_enabled, created_at
-      FROM alert_subscriptions
-      WHERE workspace_id = ?
-      ORDER BY metric_key ASC, recipient ASC
-    `)
-    .all(workspaceId) as Array<{
-    metric_key: AlertSubscription["metricKey"];
-    recipient: string;
-    channel: string;
-    is_enabled: number;
-    created_at: string;
-  }>;
-
-  return rows.map<AlertSubscription>((row) => ({
-    metricKey: row.metric_key,
-    recipient: row.recipient,
-    channel: row.channel as AlertSubscription["channel"],
-    isEnabled: Boolean(row.is_enabled),
-    createdAt: row.created_at,
-  }));
 }
 
 export function deleteSnapshot(weekOf: string) {
