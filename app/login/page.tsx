@@ -97,7 +97,7 @@ export default function LoginPage() {
       </section>
 
       <a
-        href="https://github.com/xtofuub"
+        href="https://github.com/xtofuub/RevOps-Dashboard"
         target="_blank"
         rel="noreferrer"
         className="absolute bottom-5 left-1/2 z-10 -translate-x-1/2 text-[11px] tracking-[0.22em] text-white/34 transition hover:text-white/58"
