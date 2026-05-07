@@ -31,7 +31,7 @@ npm run build
 npm start
 ```
 
-Open [http://localhost:3000/login](http://localhost:3000/login).
+Open [http://localhost/login](http://localhost/login).
 
 Default local accounts are seeded on first run:
 
