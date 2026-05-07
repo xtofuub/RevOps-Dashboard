@@ -17,15 +17,22 @@ Huom:
 npm install
 ```
 
-## Kaynnistys kehityksessa
+## Kaynnistys
 
 ```bash
-npm run dev
+npm run build
+npm start
 ```
 
 Avaa selaimessa:
 
 - `http://localhost:3000/login`
+
+## Kehitysmoodi
+
+```bash
+npm run dev
+```
 
 ## Oletustunnukset
 
@@ -37,8 +44,10 @@ Ensimmaisella kaynnistyksella luodaan paikalliset testitunnukset:
 ## Hyodylliset komennot
 
 ```bash
+npm run build    # tuotantoversio
+npm start        # kaynnista tuotantopalvelin
+npm run dev      # kehityspalvelin
 npm run lint
-npm run build
 npm run test
 ```
 
@@ -61,10 +70,6 @@ REVOPS_LEGACY_SNAPSHOT_PATH=/polku/weekly-metrics.json
 
 ## Muut dokumentaatiot
 
-Lisadokumentaatio loytyy taalta:
-
-- [README.md](C:\Users\SB1\Desktop\lol\RevOps-Dashboard\README.md)
-- [docs/developer-guide.md](C:\Users\SB1\Desktop\lol\RevOps-Dashboard\docs\developer-guide.md)
-- [docs/user-guide.md](C:\Users\SB1\Desktop\lol\RevOps-Dashboard\docs\user-guide.md)
-- [docs/RevOps-Developer-Guide.docx](C:\Users\SB1\Desktop\lol\RevOps-Dashboard\docs\RevOps-Developer-Guide.docx)
-- [docs/RevOps-User-Guide.docx](C:\Users\SB1\Desktop\lol\RevOps-Dashboard\docs\RevOps-User-Guide.docx)
+- [README.md](../README.md)
+- [docs/developer-guide.md](developer-guide.md)
+- [docs/user-guide.md](user-guide.md)

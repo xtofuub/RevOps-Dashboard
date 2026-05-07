@@ -167,6 +167,14 @@ Open `http://localhost:3000/login`.
 
 If testing from another device or VM through LAN address such as `http://10.5.0.2:3000/dashboard`, `next.config.ts` derives `allowedDevOrigins` from local IPv4 interfaces so development HMR requests are accepted.
 
+## Production
+
+```bash
+npm install
+npm run build
+npm start
+```
+
 ## Build, lint, test
 
 ```bash
