@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { verifyUserCredentials } from "@/lib/user-store";
+import { signSession } from "@/lib/session";
 
 export async function login(_: unknown, formData: FormData) {
   const username = formData.get("username") as string;
@@ -15,12 +16,9 @@ export async function login(_: unknown, formData: FormData) {
   }
 
   const jar = await cookies();
-  jar.set("session", JSON.stringify({
-    id: user.id,
-    username: user.username,
-    role: user.role,
-  }), {
+  jar.set("session", signSession({ id: user.id, username: user.username }), {
     httpOnly: true,
+    sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 8,
   });

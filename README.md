@@ -24,6 +24,8 @@ Internal operating dashboard for weekly RevOps snapshots. App built with Next.js
 ## Quick start
 
 ```bash
+cp .env.local.example .env.local
+# edit .env.local and set SESSION_SECRET to a random 32+ char string
 npm install
 npm run build
 npm start

@@ -61,7 +61,7 @@ function ensureUsersFile() {
   const now = new Date().toISOString();
   const defaultUsers: UserRecord[] = [
     {
-      id: "1",
+      id: randomUUID(),
       username: "admin",
       name: "Admin User",
       role: "admin",
@@ -71,7 +71,7 @@ function ensureUsersFile() {
       passwordUpdatedAt: now,
     },
     {
-      id: "2",
+      id: randomUUID(),
       username: "user",
       name: "Regular User",
       role: "user",

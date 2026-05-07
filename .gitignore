@@ -38,6 +38,7 @@ data/users.json
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.local.example
 
 # vercel
 .vercel
