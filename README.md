@@ -2,6 +2,16 @@
 
 Internal operating dashboard for weekly RevOps snapshots. App built with Next.js 16, React 19, shadcn/ui, Recharts, local auth, SQLite-backed snapshot history.
 
+## Showcase
+
+### Login
+
+![Login page](docs/showcase/login-page.png)
+
+### Dashboard
+
+![Dashboard overview](docs/showcase/dashboard-overview.png)
+
 ## What it does
 
 - Shows weekly revenue, product-market, and delivery health in one dashboard
@@ -15,7 +25,8 @@ Internal operating dashboard for weekly RevOps snapshots. App built with Next.js
 
 ```bash
 npm install
-npm run dev
+npm run build
+npm start
 ```
 
 Open [http://localhost:3000/login](http://localhost:3000/login).
@@ -30,9 +41,10 @@ When signed in as admin, left sidebar shows `Admin Panel` inside dashboard works
 ## Commands
 
 ```bash
-npm run dev
+npm run dev      # development server
+npm run build    # production build
+npm start        # start production server
 npm run lint
-npm run build
 npm run test
 ```
 
