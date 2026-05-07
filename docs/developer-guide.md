@@ -65,6 +65,12 @@ Before changing framework behavior, read relevant local Next.js docs in `node_mo
   - Header metadata for active workspace view.
 - `components/weekly-update-form.tsx`
   - Weekly snapshot form, validation UX, and derived field preview for pipeline velocity.
+- `components/export-workbook-button.tsx`
+  - Excel export button. Hits `/api/export/weekly-snapshots`, streams blob to download.
+- `components/require-auth.tsx`
+  - Server component guard. Redirects unauthenticated users to login, and non-matching roles to dashboard.
+- `components/user-nav.tsx`
+  - User avatar and sign-out dropdown in sidebar footer.
 
 ## Authentication and admin accounts
 
@@ -72,8 +78,8 @@ Authentication intentionally lightweight for local/internal use.
 
 - Login submits to `app/login/actions.ts`.
 - Credentials verified by `verifyUserCredentials()` in `lib/user-store.ts`.
-- App stores HTTP-only `session` cookie containing user id, username, and role.
-- `auth()` always resolves cookie against `data/users.json`, so deleted or changed users stop matching stale cookie data.
+- App stores HTTP-only `session` cookie containing user id and username only.
+- `auth()` resolves cookie against `data/users.json` on every request — role and name always reflect current user store state, so deleted or changed users stop matching immediately.
 
 Default accounts created first time local user store initializes:
 

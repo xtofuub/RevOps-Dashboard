@@ -15,7 +15,7 @@ You use it to:
 
 ## Opening dashboard
 
-Go to `/login`, then sign in.
+Go to `/login`, then sign in. Navigating to `/` or `/dashboard` while signed out also redirects you there automatically.
 
 For fresh local development setup, seeded accounts are:
 
@@ -135,11 +135,9 @@ You can view:
 
 ## Exporting data
 
-Dashboard supports Excel export through weekly snapshot export route.
+Click the `Export Excel` button in the dashboard header. Downloads an Excel workbook of saved weekly snapshot history.
 
-If export is wired to button in your current build, use that button. Otherwise export endpoint is:
-
-- `/api/export/weekly-snapshots`
+Export endpoint if needed directly: `/api/export/weekly-snapshots`
 
 ## Good data entry habits
 
