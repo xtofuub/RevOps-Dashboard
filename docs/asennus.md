@@ -14,10 +14,11 @@ Huom:
 ## Asennus
 
 ```bash
-cp .env.local.example .env.local
-# aseta SESSION_SECRET vahaan satunnaiseen merkkijonoon (min 32 merkkia)
 npm install
 ```
+
+`npm run dev`, `npm run build` ja `npm start` luovat paikallisen
+`.env.local`-tiedoston automaattisesti, jos `SESSION_SECRET` puuttuu.
 
 ## Kaynnistys
 

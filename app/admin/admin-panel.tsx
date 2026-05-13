@@ -74,9 +74,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import type {
   AdminDebugData,
+  AdminRevisionDebugRecord,
   AdminSqlConsoleState,
   AdminSqlRow,
-  AdminSqlTablePreview,
 } from "@/lib/admin-debug-types";
 import type { PublicUser, UserRole } from "@/lib/user-store";
 import { cn } from "@/lib/utils";
@@ -145,33 +145,6 @@ LIMIT 10`,
   },
 ];
 
-const backendTableMeta: Record<string, { label: string; description: string }> = {
-  workspaces: {
-    label: "Dashboard workspace",
-    description:
-      "The workspace record for this dashboard. The app currently uses one workspace.",
-  },
-  snapshots: {
-    label: "Saved weekly reports",
-    description:
-      "One row per Friday reporting week. This points at the current visible saved version.",
-  },
-  snapshot_revisions: {
-    label: "Saved report versions",
-    description:
-      "Every time a week is saved again, a new version is stored here instead of overwriting history.",
-  },
-};
-
-function getTableMeta(tableName: string) {
-  return (
-    backendTableMeta[tableName] ?? {
-      label: tableName,
-      description: "Raw backend table from the local SQLite database.",
-    }
-  );
-}
-
 function useAdminActionToast(state: AdminActionState, onSuccess?: () => void) {
   const router = useRouter();
   const lastMessageRef = React.useRef("");
@@ -229,6 +202,55 @@ function formatCellValue(value: AdminSqlRow[string]) {
   }
 
   return value;
+}
+
+function formatJsonValue(value: AdminSqlRow[string]) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue.startsWith("{") && !trimmedValue.startsWith("[")) {
+    return null;
+  }
+
+  try {
+    return JSON.stringify(JSON.parse(trimmedValue), null, 2);
+  } catch {
+    return null;
+  }
+}
+
+function GenericResultCell({
+  column,
+  value,
+}: {
+  column: string;
+  value: AdminSqlRow[string];
+}) {
+  const jsonValue = formatJsonValue(value);
+
+  if (jsonValue) {
+    return (
+      <TableCell className="max-w-[16rem] px-3 py-3 align-top">
+        <details>
+          <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+            {column.includes("payload") ? "Payload JSON" : "JSON value"}
+          </summary>
+          <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-md bg-muted/60 px-3 py-2 font-mono text-xs leading-relaxed text-muted-foreground">
+            {jsonValue}
+          </pre>
+        </details>
+      </TableCell>
+    );
+  }
+
+  return (
+    <TableCell className="max-w-[20rem] whitespace-pre-wrap break-words px-3 py-3 align-top font-mono text-xs leading-relaxed text-foreground/85">
+      {formatCellValue(value)}
+    </TableCell>
+  );
 }
 
 function RoleBadge({ role }: { role: UserRole }) {
@@ -721,12 +743,15 @@ function GenericResultTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border">
-      <Table>
+    <div className="overflow-hidden rounded-lg border bg-background/60">
+      <Table className="min-w-[42rem]">
         <TableHeader>
-          <TableRow>
+          <TableRow className="bg-muted/45 hover:bg-muted/45">
             {columns.map((column) => (
-              <TableHead key={column} className="whitespace-nowrap">
+              <TableHead
+                key={column}
+                className="h-9 whitespace-nowrap px-3 text-xs font-semibold uppercase text-muted-foreground"
+              >
                 {column}
               </TableHead>
             ))}
@@ -736,12 +761,11 @@ function GenericResultTable({
           {rows.map((row, index) => (
             <TableRow key={index}>
               {columns.map((column) => (
-                <TableCell
+                <GenericResultCell
                   key={column}
-                  className="max-w-[18rem] whitespace-pre-wrap break-words align-top font-mono text-xs"
-                >
-                  {formatCellValue(row[column])}
-                </TableCell>
+                  column={column}
+                  value={row[column]}
+                />
               ))}
             </TableRow>
           ))}
@@ -751,253 +775,359 @@ function GenericResultTable({
   );
 }
 
+function BackendMetric({
+  label,
+  value,
+  description,
+}: {
+  label: string;
+  value: string | number;
+  description: string;
+}) {
+  return (
+    <div className="rounded-lg border bg-background/55 px-4 py-3">
+      <div className="text-xs font-medium uppercase text-muted-foreground">
+        {label}
+      </div>
+      <div className="mt-2 text-2xl font-semibold tracking-tight">{value}</div>
+      <div className="mt-1 text-xs text-muted-foreground">{description}</div>
+    </div>
+  );
+}
+
+function PathRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid gap-2 rounded-lg border bg-background/55 px-4 py-3 md:grid-cols-[10rem_minmax(0,1fr)] md:items-center">
+      <div className="text-sm font-medium">{label}</div>
+      <code className="break-all rounded-md bg-muted/70 px-2 py-1.5 text-xs text-muted-foreground">
+        {value}
+      </code>
+    </div>
+  );
+}
+
 function StorageOverviewCard({
   debugData,
 }: {
   debugData: AdminDebugData;
 }) {
+  const latestRevision = debugData.recentRevisions[0] ?? null;
+  const latestSnapshot = debugData.snapshots[0] ?? null;
+  const mostRevisedSnapshot =
+    [...debugData.snapshots].sort(
+      (left, right) =>
+        right.revisionCount - left.revisionCount ||
+        right.weekOf.localeCompare(left.weekOf),
+    )[0] ?? null;
+
   return (
     <Card className="border-border bg-card shadow-none">
-      <CardHeader>
-        <CardTitle>Real backend data</CardTitle>
+      <CardHeader className="gap-1.5">
+        <CardTitle>Backend health</CardTitle>
         <CardDescription>
-          Live read-only data from the local SQLite database and user file used
-          by this app.
+          The dashboard stores one workspace, one current row per reporting
+          week, and immutable revisions for every save.
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-3">
-          <div>
-            <div className="text-sm font-medium">SQLite database</div>
-            <p className="mt-1 break-all rounded-lg bg-muted px-3 py-2 font-mono text-xs text-muted-foreground">
-              {debugData.databaseFilePath}
-            </p>
-          </div>
-          <div>
-            <div className="text-sm font-medium">Local user store</div>
-            <p className="mt-1 break-all rounded-lg bg-muted px-3 py-2 font-mono text-xs text-muted-foreground">
-              {debugData.usersFilePath}
-            </p>
-          </div>
+      <CardContent className="grid gap-5">
+        <div className="grid gap-3 xl:grid-cols-3">
+          <BackendMetric
+            label="Current reports"
+            value={debugData.snapshotCount}
+            description="Weeks visible in the dashboard"
+          />
+          <BackendMetric
+            label="Saved versions"
+            value={debugData.revisionCount}
+            description="Audit history across all weeks"
+          />
+          <BackendMetric
+            label="Data groups"
+            value={debugData.tableCount}
+            description="Workspace, reports, and history"
+          />
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-lg border bg-muted/20 px-4 py-3">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Backend tables
-            </div>
-            <div className="mt-1 text-xl font-semibold">{debugData.tableCount}</div>
-          </div>
-          <div className="rounded-lg border bg-muted/20 px-4 py-3">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Weekly reports
-            </div>
-            <div className="mt-1 text-xl font-semibold">{debugData.snapshotCount}</div>
-          </div>
-          <div className="rounded-lg border bg-muted/20 px-4 py-3">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Saved versions
-            </div>
-            <div className="mt-1 text-xl font-semibold">{debugData.revisionCount}</div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
-function SqlTableViewer({ tables }: { tables: AdminSqlTablePreview[] }) {
-  const [selectedTableName, setSelectedTableName] = React.useState(
-    tables[0]?.name ?? "",
-  );
-  const selectedTable =
-    tables.find((table) => table.name === selectedTableName) ?? tables[0] ?? null;
-  const selectedTableMeta = selectedTable ? getTableMeta(selectedTable.name) : null;
-
-  if (!selectedTable) {
-    return (
-      <Card className="border-border bg-card shadow-none">
-        <CardHeader>
-          <CardTitle>Read-only SQL table viewer</CardTitle>
-          <CardDescription>No SQL tables are available yet.</CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  }
-
-  return (
-    <Card className="border-border bg-card shadow-none">
-      <CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-1">
-          <CardTitle>Backend table viewer</CardTitle>
-          <CardDescription>
-            Browse real app data from SQLite. Plain names are shown first; raw
-            table names are still visible for debugging.
-          </CardDescription>
-        </div>
-        <div className="w-full max-w-xs">
-          <Select
-            value={selectedTable.name}
-            onValueChange={(nextValue) => {
-              if (nextValue) {
-                setSelectedTableName(nextValue);
-              }
-            }}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {tables.map((table) => (
-                  <SelectItem key={table.name} value={table.name}>
-                    {getTableMeta(table.name).label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {selectedTableMeta ? (
-          <div className="rounded-lg border bg-muted/20 px-4 py-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="font-medium">{selectedTableMeta.label}</div>
-              <Badge variant="outline" className="font-mono">
-                {selectedTable.name}
-              </Badge>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {selectedTableMeta.description}
-            </p>
-          </div>
-        ) : null}
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="outline">{selectedTable.rowCount} rows</Badge>
-          <Badge variant="outline">{selectedTable.columns.length} columns</Badge>
-          {selectedTable.truncated ? (
-            <Badge variant="secondary">
-              Previewing first {selectedTable.previewLimit} rows
-            </Badge>
-          ) : null}
-        </div>
-        <div className="grid gap-2 lg:grid-cols-2">
-          {selectedTable.columns.map((column) => (
-            <div
-              key={column.name}
-              className="rounded-lg border bg-muted/20 px-3 py-2 text-sm"
-            >
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium">{column.name}</span>
-                <Badge variant="secondary">{column.type}</Badge>
-                {column.isPrimaryKey ? <Badge variant="outline">PK</Badge> : null}
-                {column.notNull ? <Badge variant="outline">NOT NULL</Badge> : null}
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,0.65fr)]">
+          <div className="rounded-lg border bg-background/55">
+            <div className="border-b px-4 py-3">
+              <div className="text-sm font-medium">How saves work</div>
+              <div className="text-xs text-muted-foreground">
+                Simple version history for weekly updates
               </div>
-              {column.defaultValue ? (
-                <p className="mt-1 font-mono text-xs text-muted-foreground">
-                  default: {column.defaultValue}
-                </p>
+            </div>
+            <div className="grid gap-0 divide-y">
+              <div className="grid gap-1 px-4 py-3 sm:grid-cols-[8rem_minmax(0,1fr)]">
+                <div className="text-sm font-medium">Save</div>
+                <div className="text-sm text-muted-foreground">
+                  A weekly update is saved for a reporting week.
+                </div>
+              </div>
+              <div className="grid gap-1 px-4 py-3 sm:grid-cols-[8rem_minmax(0,1fr)]">
+                <div className="text-sm font-medium">Show</div>
+                <div className="text-sm text-muted-foreground">
+                  The dashboard shows the newest saved version for each week.
+                </div>
+              </div>
+              <div className="grid gap-1 px-4 py-3 sm:grid-cols-[8rem_minmax(0,1fr)]">
+                <div className="text-sm font-medium">Keep</div>
+                <div className="text-sm text-muted-foreground">
+                  Older saves stay available as version history.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-lg border bg-background/55">
+            <div className="border-b px-4 py-3">
+              <div className="text-sm font-medium">Latest activity</div>
+              <div className="text-xs text-muted-foreground">
+                Useful admin signals without opening raw rows
+              </div>
+            </div>
+            <div className="grid gap-3 p-4">
+              <div>
+                <div className="text-xs text-muted-foreground">Latest week</div>
+                <div className="mt-0.5 font-medium">
+                  {latestSnapshot?.weekOf ?? "No reports yet"}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Last save</div>
+                <div className="mt-0.5 font-medium">
+                  {latestRevision
+                    ? `${latestRevision.weekOf} v${latestRevision.revisionNumber}`
+                    : "No saves yet"}
+                </div>
+                {latestRevision ? (
+                  <div className="text-xs text-muted-foreground">
+                    {latestRevision.authorLabel}, {formatDate(latestRevision.createdAt)}
+                  </div>
+                ) : null}
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">
+                  Most revised week
+                </div>
+                <div className="mt-0.5 font-medium">
+                  {mostRevisedSnapshot
+                    ? `${mostRevisedSnapshot.weekOf} (${mostRevisedSnapshot.revisionCount} versions)`
+                    : "No revisions yet"}
+                </div>
+              </div>
+              {latestRevision ? (
+                <div className="grid gap-1.5 sm:grid-cols-2">
+                  {latestRevision.payloadSummary.slice(0, 4).map((item) => (
+                    <div
+                      key={item.label}
+                      className="rounded-md bg-muted/45 px-2 py-1"
+                    >
+                      <div className="text-[11px] text-muted-foreground">
+                        {item.label}
+                      </div>
+                      <div className="text-sm font-medium">{item.value}</div>
+                    </div>
+                  ))}
+                </div>
               ) : null}
             </div>
+          </div>
+        </div>
+
+        <div className="grid gap-3">
+          <PathRow label="SQLite database" value={debugData.databaseFilePath} />
+          <PathRow label="Local user store" value={debugData.usersFilePath} />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+type BackendDataView = "reports" | "versions" | "workspace";
+
+function RevisionDetailsDialog({
+  revision,
+}: {
+  revision: AdminRevisionDebugRecord;
+}) {
+  return (
+    <Dialog>
+      <DialogTrigger render={
+        <Button type="button" variant="outline" size="sm">
+          Details
+        </Button>
+      } />
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>
+            {revision.weekOf} v{revision.revisionNumber}
+          </DialogTitle>
+          <DialogDescription>
+            Saved by {revision.authorLabel} on {formatDate(revision.createdAt)}.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-4">
+          {revision.payloadSections.map((section) => (
+            <section
+              key={`${revision.id}-${section.title}`}
+              className="rounded-lg border bg-background/55"
+            >
+              <div className="border-b px-4 py-3">
+                <h3 className="text-sm font-medium">{section.title}</h3>
+              </div>
+              <dl className="grid gap-x-5 gap-y-3 p-4 sm:grid-cols-2">
+                {section.items.map((item) => (
+                  <div key={`${section.title}-${item.label}`} className="min-w-0">
+                    <dt className="text-xs text-muted-foreground">
+                      {item.label}
+                    </dt>
+                    <dd className="mt-0.5 break-words text-sm font-medium leading-relaxed">
+                      {item.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          ))}
+
+          <details className="rounded-lg border bg-background/55 px-4 py-3">
+            <summary className="cursor-pointer text-sm font-medium">
+              Raw JSON
+            </summary>
+            <pre className="mt-3 max-h-56 overflow-auto whitespace-pre-wrap rounded-md bg-muted/60 px-3 py-2 font-mono text-xs leading-relaxed text-muted-foreground">
+              {revision.payloadPreview}
+            </pre>
+          </details>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SimpleBackendDataCard({ debugData }: { debugData: AdminDebugData }) {
+  const [activeView, setActiveView] = React.useState<BackendDataView>("reports");
+  const workspaceRows =
+    debugData.tables.find((table) => table.name === "workspaces")?.rows ?? [];
+
+  return (
+    <Card className="border-border bg-card shadow-none">
+      <CardHeader className="gap-3">
+        <div>
+          <CardTitle>Dashboard data</CardTitle>
+          <CardDescription>
+            Simple view of what is stored, without SQL schema details.
+          </CardDescription>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { id: "reports", label: "Weekly reports" },
+            { id: "versions", label: "Saved versions" },
+            { id: "workspace", label: "Workspace" },
+          ].map((view) => (
+            <Button
+              key={view.id}
+              type="button"
+              size="sm"
+              variant={activeView === view.id ? "default" : "outline"}
+              onClick={() => setActiveView(view.id as BackendDataView)}
+            >
+              {view.label}
+            </Button>
           ))}
         </div>
-        <GenericResultTable
-          columns={selectedTable.columns.map((column) => column.name)}
-          rows={selectedTable.rows}
-          emptyMessage="This table exists but currently has no rows."
-        />
-      </CardContent>
-    </Card>
-  );
-}
-
-function SnapshotHistoryCard({ debugData }: { debugData: AdminDebugData }) {
-  return (
-    <Card className="border-border bg-card shadow-none">
-      <CardHeader>
-        <CardTitle>Saved weekly reports</CardTitle>
-        <CardDescription>
-          One row per reporting week. If the same Friday is saved again, the
-          version count increases and the newest version becomes current.
-        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Week ending</TableHead>
-                <TableHead>Report ID</TableHead>
-                <TableHead>Current version ID</TableHead>
-                <TableHead>Saved versions</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Updated</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {debugData.snapshots.map((snapshot) => (
-                <TableRow key={snapshot.id}>
-                  <TableCell>{snapshot.weekOf}</TableCell>
-                  <TableCell className="font-mono text-xs">{snapshot.id}</TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {snapshot.latestRevisionId ?? "NULL"}
-                  </TableCell>
-                  <TableCell>{snapshot.revisionCount}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatDate(snapshot.createdAt)}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatDate(snapshot.updatedAt)}
-                  </TableCell>
+        {activeView === "reports" ? (
+          <div className="overflow-hidden rounded-lg border bg-background/55">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/45 hover:bg-muted/45">
+                  <TableHead>Week</TableHead>
+                  <TableHead>Versions</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Last updated</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+              </TableHeader>
+              <TableBody>
+                {debugData.snapshots.map((snapshot) => (
+                  <TableRow key={snapshot.id}>
+                    <TableCell className="font-medium">{snapshot.weekOf}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {snapshot.revisionCount}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatDate(snapshot.createdAt)}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatDate(snapshot.updatedAt)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ) : null}
 
-function RecentRevisionsCard({ debugData }: { debugData: AdminDebugData }) {
-  return (
-    <Card className="border-border bg-card shadow-none">
-      <CardHeader>
-        <CardTitle>Recent saved versions</CardTitle>
-        <CardDescription>
-          Audit trail for recent saves. Payload preview is the actual JSON data
-          stored for that weekly report version.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Week ending</TableHead>
-                <TableHead>Version</TableHead>
-                <TableHead>Saved by</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Stored report data preview</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {debugData.recentRevisions.map((revision) => (
-                <TableRow key={revision.id}>
-                  <TableCell>{revision.weekOf}</TableCell>
-                  <TableCell>r{revision.revisionNumber}</TableCell>
-                  <TableCell>{revision.authorLabel}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatDate(revision.createdAt)}
-                  </TableCell>
-                  <TableCell className="max-w-[28rem] whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground">
-                    {revision.payloadPreview}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        {activeView === "versions" ? (
+          <div className="grid gap-3">
+            {debugData.recentRevisions.map((revision) => (
+              <div
+                key={revision.id}
+                className="rounded-lg border bg-background/55 px-4 py-3"
+              >
+                <div className="flex flex-wrap items-start gap-3">
+                  <div className="mr-auto">
+                    <div className="font-medium">
+                      {revision.weekOf} v{revision.revisionNumber}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {revision.authorLabel}, {formatDate(revision.createdAt)}
+                    </div>
+                  </div>
+                  <RevisionDetailsDialog revision={revision} />
+                </div>
+                <div className="mt-3 grid gap-1.5 sm:grid-cols-3 lg:grid-cols-6">
+                  {revision.payloadSummary.map((item) => (
+                    <div
+                      key={`${revision.id}-${item.label}`}
+                      className="rounded-md bg-muted/45 px-2 py-1"
+                    >
+                      <div className="text-[11px] text-muted-foreground">
+                        {item.label}
+                      </div>
+                      <div className="text-sm font-medium">{item.value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {activeView === "workspace" ? (
+          <div className="grid gap-3">
+            {workspaceRows.map((workspace, index) => (
+              <div
+                key={`${workspace.id ?? index}`}
+                className="rounded-lg border bg-background/55 px-4 py-3"
+              >
+                <div className="font-medium">
+                  {formatCellValue(workspace.name) || "Dashboard workspace"}
+                </div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  Slug: {formatCellValue(workspace.slug) || "default"}
+                </div>
+                <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                  <div>Created: {formatCellValue(workspace.created_at)}</div>
+                  <div>Updated: {formatCellValue(workspace.updated_at)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );
@@ -1293,9 +1423,7 @@ export function AdminPanel({
         {debugData ? (
           <TabsContent value="backend" className="space-y-6">
             <StorageOverviewCard debugData={debugData} />
-            <SqlTableViewer tables={debugData.tables} />
-            <SnapshotHistoryCard debugData={debugData} />
-            <RecentRevisionsCard debugData={debugData} />
+            <SimpleBackendDataCard debugData={debugData} />
           </TabsContent>
         ) : null}
         {debugData ? (

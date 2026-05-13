@@ -60,10 +60,6 @@ function isCanonicalIsoDate(value: string) {
   return formatIsoDate(parseIsoUtcDate(value)) === value;
 }
 
-function isWeekEndingDate(value: string) {
-  return parseIsoUtcDate(value).getUTCDay() === 5;
-}
-
 const stageMetricSchema = z.object({
   stage: z.enum(DEFAULT_STAGE_ORDER),
   conversionPct: z.number().min(0).max(100),

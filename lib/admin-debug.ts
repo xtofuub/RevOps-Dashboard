@@ -22,7 +22,7 @@ const dataDirectoryPath = path.join(
 const tablePreviewRowLimit = 12;
 const sqlConsoleRowLimit = 100;
 const maxSqlQueryLength = 8_000;
-const maxPayloadPreviewLength = 220;
+const maxPayloadPreviewLength = 1_200;
 
 type SnapshotSummaryRow = {
   id: number;
@@ -112,6 +112,141 @@ function serializeSqlRow(row: Record<string, unknown>) {
   return Object.fromEntries(
     Object.entries(row).map(([key, value]) => [key, serializeSqlValue(value)]),
   ) as AdminSqlRow;
+}
+
+function formatPayloadPreview(payloadJson: string) {
+  let preview = payloadJson;
+
+  try {
+    preview = JSON.stringify(JSON.parse(payloadJson), null, 2);
+  } catch {
+    preview = payloadJson;
+  }
+
+  return preview.length > maxPayloadPreviewLength
+    ? `${preview.slice(0, maxPayloadPreviewLength)}\n...`
+    : preview;
+}
+
+function formatCompactCurrency(value: unknown) {
+  return typeof value === "number"
+    ? new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "EUR",
+        notation: "compact",
+        maximumFractionDigits: 1,
+      }).format(value)
+    : "n/a";
+}
+
+function formatCompactNumber(value: unknown, suffix = "") {
+  return typeof value === "number"
+    ? `${new Intl.NumberFormat("en-US", {
+        maximumFractionDigits: 1,
+      }).format(value)}${suffix}`
+    : "n/a";
+}
+
+function buildPayloadSummary(payloadJson: string) {
+  try {
+    const payload = JSON.parse(payloadJson) as Record<string, unknown>;
+
+    return [
+      { label: "Pipeline", value: formatCompactCurrency(payload.pipelineValue) },
+      { label: "Close rate", value: formatCompactNumber(payload.closeRatePct, "%") },
+      {
+        label: "Won / sent",
+        value: `${formatCompactNumber(payload.ordersWon)} / ${formatCompactNumber(payload.proposalsSent)}`,
+      },
+      { label: "SLA", value: formatCompactNumber(payload.feedSlaQualityScore, "%") },
+      { label: "Incidents", value: formatCompactNumber(payload.incidentCount) },
+      { label: "NRR", value: formatCompactNumber(payload.netRevenueRetentionPct, "%") },
+    ];
+  } catch {
+    return [{ label: "Payload", value: "JSON unavailable" }];
+  }
+}
+
+function buildPayloadSections(payloadJson: string) {
+  try {
+    const payload = JSON.parse(payloadJson) as Record<string, unknown>;
+    const lossReasons = Array.isArray(payload.lossReasonsTop3)
+      ? payload.lossReasonsTop3.join(", ")
+      : "n/a";
+    const requests = Array.isArray(payload.repeatedRequests)
+      ? payload.repeatedRequests.join(", ")
+      : "n/a";
+    const stageFlow = Array.isArray(payload.stageMetrics)
+      ? payload.stageMetrics
+          .map((stageMetric) => {
+            if (
+              !stageMetric ||
+              typeof stageMetric !== "object" ||
+              !("stage" in stageMetric)
+            ) {
+              return null;
+            }
+
+            const metric = stageMetric as Record<string, unknown>;
+
+            return {
+              label: String(metric.stage),
+              value: `${formatCompactNumber(metric.conversionPct, "%")} / ${formatCompactNumber(metric.avgDaysInStage, "d")}`,
+            };
+          })
+          .filter((item): item is { label: string; value: string } => item !== null)
+      : [];
+
+    return [
+      {
+        title: "Revenue",
+        items: [
+          { label: "New customers", value: formatCompactNumber(payload.newCustomersPerMonth) },
+          { label: "Pipeline", value: formatCompactCurrency(payload.pipelineValue) },
+          { label: "Close rate", value: formatCompactNumber(payload.closeRatePct, "%") },
+          { label: "Sales cycle", value: formatCompactNumber(payload.salesCycleDays, "d") },
+          { label: "Coverage", value: formatCompactNumber(payload.pipelineCoverageRatio, "x") },
+          { label: "Avg deal", value: formatCompactCurrency(payload.averageDealSize) },
+        ],
+      },
+      {
+        title: "Market signal",
+        items: [
+          { label: "Feed retention", value: formatCompactNumber(payload.feedRetentionPct, "%") },
+          { label: "NRR", value: formatCompactNumber(payload.netRevenueRetentionPct, "%") },
+          { label: "GRR", value: formatCompactNumber(payload.grossRevenueRetentionPct, "%") },
+          { label: "Lead to opp", value: formatCompactNumber(payload.leadToOpportunityConversionPct, "%") },
+        ],
+      },
+      {
+        title: "Delivery",
+        items: [
+          { label: "Proposals sent", value: formatCompactNumber(payload.proposalsSent) },
+          { label: "Orders won", value: formatCompactNumber(payload.ordersWon) },
+          { label: "SLA quality", value: formatCompactNumber(payload.feedSlaQualityScore, "%") },
+          { label: "Incidents", value: formatCompactNumber(payload.incidentCount) },
+        ],
+      },
+      {
+        title: "Text signals",
+        items: [
+          { label: "Lost because", value: lossReasons },
+          { label: "Requests", value: requests },
+        ],
+      },
+      {
+        title: "Stage flow",
+        items: stageFlow,
+      },
+    ].filter((section) => section.items.length > 0);
+  } catch {
+    return [
+      {
+        title: "Payload",
+        items: [{ label: "Status", value: "Could not parse payload JSON" }],
+      },
+    ];
+  }
 }
 
 function loadTableColumns(
@@ -262,10 +397,9 @@ export function buildAdminDebugData(): AdminDebugData {
         revisionNumber: row.revision_number,
         createdAt: row.created_at,
         authorLabel: row.author_label,
-        payloadPreview:
-          row.payload_json.length > maxPayloadPreviewLength
-            ? `${row.payload_json.slice(0, maxPayloadPreviewLength)}...`
-            : row.payload_json,
+        payloadSummary: buildPayloadSummary(row.payload_json),
+        payloadSections: buildPayloadSections(row.payload_json),
+        payloadPreview: formatPayloadPreview(row.payload_json),
       })),
     };
   } finally {

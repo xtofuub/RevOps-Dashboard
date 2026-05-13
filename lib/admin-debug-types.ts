@@ -34,6 +34,17 @@ export type AdminRevisionDebugRecord = {
   revisionNumber: number;
   createdAt: string;
   authorLabel: string;
+  payloadSummary: {
+    label: string;
+    value: string;
+  }[];
+  payloadSections: {
+    title: string;
+    items: {
+      label: string;
+      value: string;
+    }[];
+  }[];
   payloadPreview: string;
 };
 

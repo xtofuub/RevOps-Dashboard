@@ -24,14 +24,14 @@ Internal operating dashboard for weekly RevOps snapshots. App built with Next.js
 ## Quick start
 
 ```bash
-cp .env.local.example .env.local
-# edit .env.local and set SESSION_SECRET to a random 32+ char string
 npm install
 npm run build
 npm start
 ```
 
 Open [http://localhost:3000/login](http://localhost:3000/login).
+
+`npm run dev`, `npm run build`, and `npm start` create `.env.local` with a random `SESSION_SECRET` when one is missing or still using the example placeholder.
 
 Default local accounts are seeded on first run:
 

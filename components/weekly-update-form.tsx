@@ -320,6 +320,9 @@ export function WeeklyUpdateForm({
 
   const currentStoredSnapshot =
     snapshots.find((snapshot) => snapshot.weekOf === formState.weekOf) ?? null;
+  const savedTemplateSnapshots = [...snapshots]
+    .filter((snapshot) => snapshot.weekOf !== suggestedWeekOf)
+    .sort((left, right) => right.weekOf.localeCompare(left.weekOf));
   const isSaving = isSubmitting || isRefreshing;
 
   const isCloseRateAutoCalc =
@@ -450,8 +453,8 @@ export function WeeklyUpdateForm({
   }
 
   return (
-    <Card className="border-border/60 bg-card/90 shadow-sm backdrop-blur">
-      <CardHeader className="gap-4">
+    <Card className="border-border/60 bg-card/90 shadow-sm">
+      <CardHeader className="gap-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex flex-col gap-1">
             <CardTitle>Weekly update</CardTitle>
@@ -460,22 +463,22 @@ export function WeeklyUpdateForm({
               again, your earlier values are kept in revision history.
             </CardDescription>
           </div>
-          <Badge variant="outline">
+          <Badge variant="outline" className="h-8 gap-1.5 px-3">
             <CalendarDaysIcon data-icon="inline-start" />
             One save per week
           </Badge>
         </div>
-        <Alert>
+        <Alert className="items-start gap-3">
           <DatabaseIcon />
           <AlertTitle>
             {currentStoredSnapshot
-              ? `Week ending ${formatWeekLabelWithYear(formState.weekOf)} already saved`
-              : `New week: ${formatWeekLabelWithYear(formState.weekOf)}`}
+              ? `Editing ${formatWeekLabelWithYear(formState.weekOf)}`
+              : `Ready for ${formatWeekLabelWithYear(formState.weekOf)}`}
           </AlertTitle>
           <AlertDescription>
             {currentStoredSnapshot
-              ? "Saving now creates a new revision. Your earlier values stay in history."
-              : "Saving now adds this week to your dashboard history."}
+              ? "Saving creates a revision and keeps the earlier values in history."
+              : "Saving adds this reporting week to your dashboard history."}
           </AlertDescription>
           <AlertAction>
             <Badge variant="outline">
@@ -487,7 +490,7 @@ export function WeeklyUpdateForm({
       <form onSubmit={handleSubmit}>
         <CardContent className="flex flex-col gap-6">
           <FieldGroup>
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)_auto]">
               <Field data-invalid={Boolean(fieldErrors.weekOf)}>
                 <FieldLabel htmlFor="weekOf">Week ending date</FieldLabel>
                 <FieldContent>
@@ -504,14 +507,14 @@ export function WeeklyUpdateForm({
                     }
                   />
                   <FieldDescription>
-                    Pick the Friday that ends the reporting week. Defaults to today.
+                    Pick the date that closes this reporting week.
                   </FieldDescription>
                   <FieldError>{fieldErrors.weekOf}</FieldError>
                 </FieldContent>
               </Field>
 
               <Field>
-                <FieldLabel>Load from saved week</FieldLabel>
+                <FieldLabel>Start from</FieldLabel>
                 <FieldContent>
                   <Select
                     value={templateSelection}
@@ -526,14 +529,11 @@ export function WeeklyUpdateForm({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        <SelectLabel>Starting point</SelectLabel>
+                        <SelectLabel>Template</SelectLabel>
                         <SelectItem value="today">
-                          Today&apos;s date
+                          Latest saved values
                         </SelectItem>
-                        {[...snapshots]
-                          .sort((left, right) =>
-                            right.weekOf.localeCompare(left.weekOf),
-                          )
+                        {savedTemplateSnapshots
                           .map((snapshot) => (
                             <SelectItem
                               key={snapshot.weekOf}
@@ -546,7 +546,7 @@ export function WeeklyUpdateForm({
                     </SelectContent>
                   </Select>
                   <FieldDescription>
-                    Pick a saved week to edit it, or stay on today to start a fresh entry.
+                    Reuse prior values, then save them under the date on the left.
                   </FieldDescription>
                 </FieldContent>
               </Field>
@@ -559,7 +559,7 @@ export function WeeklyUpdateForm({
                   onClick={() => loadTemplate("today")}
                 >
                   <RefreshCwIcon data-icon="inline-start" />
-                  Use latest template
+                  Reset
                 </Button>
               </div>
             </div>
