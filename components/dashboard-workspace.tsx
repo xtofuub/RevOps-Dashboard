@@ -17,11 +17,13 @@ import {
   ArrowUpRightIcon,
   CalendarRangeIcon,
   ChartBarIcon,
+  ClockIcon,
   DatabaseIcon,
   FileTextIcon,
   LayoutDashboardIcon,
   ListIcon,
   ShieldCheckIcon,
+  TimerIcon,
   TriangleAlertIcon,
 } from "lucide-react";
 
@@ -141,6 +143,8 @@ const summaryMetricIcons: Partial<
   pipelineCoverageRatio: ActivityIcon,
   averageDealSize: ChartBarIcon,
   customerAcquisitionCost: TriangleAlertIcon,
+  cacPaybackMonths: TimerIcon,
+  salesCycleDays: ClockIcon,
   marketingSourcedPipelineCount: LayoutDashboardIcon,
   feedRetentionPct: ShieldCheckIcon,
   grossRevenueRetentionPct: ShieldCheckIcon,
@@ -242,11 +246,19 @@ const overviewMetricKeys: NumericMetricKey[] = [
 ];
 
 const revenueMetricKeys: NumericMetricKey[] = [
+  // Outcomes: what closed
+  "newCustomersPerMonth",
   "closeRatePct",
-  "pipelineCoverageRatio",
-  "pipelineVelocity",
-  "marketingSourcedPipelineCount",
   "averageDealSize",
+  // Speed: how fast deals move
+  "salesCycleDays",
+  "pipelineVelocity",
+  // Cost & payback: what acquisition cost
+  "customerAcquisitionCost",
+  "cacPaybackMonths",
+  // Coverage & top-of-funnel volume
+  "pipelineCoverageRatio",
+  "marketingSourcedPipelineCount",
 ];
 
 const productMetricKeys: NumericMetricKey[] = [
@@ -324,18 +336,17 @@ const comparisonPercentFormatter = new Intl.NumberFormat("en-US", {
 });
 
 function getComparisonTone(
-  betterDirection: MetricFieldDefinition["betterDirection"],
+  _betterDirection: MetricFieldDefinition["betterDirection"],
   delta: number,
 ) {
-  if (delta === 0 || betterDirection === "neutral") {
+  if (delta === 0) {
     return "neutral" as const;
   }
 
-  const isPositiveOutcome =
-    (betterDirection === "up" && delta > 0) ||
-    (betterDirection === "down" && delta < 0);
-
-  return isPositiveOutcome ? ("positive" as const) : ("negative" as const);
+  // Sign-based coloring: any decrease vs range start is red,
+  // any increase is green, regardless of whether the metric
+  // is semantically "better when down" (e.g. CAC, sales cycle).
+  return delta > 0 ? ("positive" as const) : ("negative" as const);
 }
 
 function formatComparisonPercent(value: number) {
@@ -928,7 +939,7 @@ export function DashboardWorkspace({
       style={
         {
           "--sidebar-width": "18rem",
-          "--header-height": "4.25rem",
+          "--header-height": "3.25rem",
         } as React.CSSProperties
       }
       className="min-h-svh bg-transparent"
@@ -939,7 +950,7 @@ export function DashboardWorkspace({
         dashboard={dashboard}
         user={user}
       />
-      <SidebarInset className="min-h-svh overflow-hidden border-l border-border/60 bg-background/50 backdrop-blur-sm">
+      <SidebarInset className="min-h-svh overflow-hidden border-l border-border/55 bg-background">
         <SiteHeader
           activeView={activeView}
           onViewChange={setActiveView}
@@ -956,24 +967,24 @@ export function DashboardWorkspace({
           }}
           className="@container/main flex flex-1 flex-col gap-0"
         >
-          <div className="sticky top-0 z-20 border-b border-border bg-background px-4 py-4 lg:px-6">
+          <div className="sticky top-0 z-20 border-b border-border/55 bg-background/95 px-3 py-2.5 lg:px-5">
             {hasData && showAnalysisControls ? (
-              <div className="mt-3 border-t border-border pt-3">
-                <div className="flex flex-col gap-3">
-                  <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
-                    <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+              <div>
+                <div className="flex flex-col gap-2">
+                  <div className="rounded-lg border border-border/55 bg-card/80 p-2.5">
+                    <div className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
                       <div className="flex max-w-xl flex-col gap-1">
-                        <div className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                        <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                           Trend range
                         </div>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                           Applies to the charts and ranked signal tables in this
                           workspace.
                         </p>
                       </div>
 
-                      <div className="flex flex-wrap items-end gap-3 xl:justify-end">
-                        <div className="flex min-w-[19rem] flex-1 flex-col gap-1.5 sm:flex-none">
+                      <div className="flex flex-wrap items-end gap-2 xl:justify-end">
+                        <div className="flex min-w-[17rem] flex-1 flex-col gap-1 sm:flex-none">
                           <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                             Window
                           </span>
@@ -992,24 +1003,24 @@ export function DashboardWorkspace({
                               }
                             }}
                             variant="outline"
-                            size="default"
-                            className="w-full flex-wrap rounded-xl"
+                            size="sm"
+                            className="w-full flex-wrap rounded-md"
                           >
                             <ToggleGroupItem
                               value="7d"
-                              className="min-w-[7.5rem] flex-1 justify-center px-4 sm:flex-none sm:min-w-[8.25rem]"
+                              className="min-w-[6.5rem] flex-1 justify-center px-3 sm:flex-none sm:min-w-[7rem]"
                             >
                               Last 7 days
                             </ToggleGroupItem>
                             <ToggleGroupItem
                               value="30d"
-                              className="min-w-[7.5rem] flex-1 justify-center px-4 sm:flex-none sm:min-w-[8.25rem]"
+                              className="min-w-[6.5rem] flex-1 justify-center px-3 sm:flex-none sm:min-w-[7rem]"
                             >
                               Last 30 days
                             </ToggleGroupItem>
                             <ToggleGroupItem
                               value="weeks"
-                              className="min-w-[7.5rem] flex-1 justify-center px-4 sm:flex-none sm:min-w-[8.25rem]"
+                              className="min-w-[6.5rem] flex-1 justify-center px-3 sm:flex-none sm:min-w-[7rem]"
                             >
                               Week range
                             </ToggleGroupItem>
@@ -1017,7 +1028,7 @@ export function DashboardWorkspace({
                         </div>
 
                         {activeForecast ? (
-                          <div className="flex min-w-[19rem] flex-1 flex-col gap-1.5 sm:flex-none">
+                          <div className="flex min-w-[17rem] flex-1 flex-col gap-1 sm:flex-none">
                             <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                               Prediction
                             </span>
@@ -1036,24 +1047,24 @@ export function DashboardWorkspace({
                                 }
                               }}
                               variant="outline"
-                              size="default"
-                              className="w-full flex-wrap rounded-xl"
+                              size="sm"
+                              className="w-full flex-wrap rounded-md"
                             >
                               <ToggleGroupItem
                                 value="off"
-                                className="min-w-[7.5rem] flex-1 justify-center px-4 sm:flex-none sm:min-w-[8.25rem]"
+                                className="min-w-[6.5rem] flex-1 justify-center px-3 sm:flex-none sm:min-w-[7rem]"
                               >
                                 No prediction
                               </ToggleGroupItem>
                               <ToggleGroupItem
                                 value="7d"
-                                className="min-w-[7.5rem] flex-1 justify-center px-4 sm:flex-none sm:min-w-[8.25rem]"
+                                className="min-w-[6.5rem] flex-1 justify-center px-3 sm:flex-none sm:min-w-[7rem]"
                               >
                                 Predict 7 days
                               </ToggleGroupItem>
                               <ToggleGroupItem
                                 value="30d"
-                                className="min-w-[7.5rem] flex-1 justify-center px-4 sm:flex-none sm:min-w-[8.25rem]"
+                                className="min-w-[6.5rem] flex-1 justify-center px-3 sm:flex-none sm:min-w-[7rem]"
                               >
                                 Predict 30 days
                               </ToggleGroupItem>
@@ -1064,9 +1075,9 @@ export function DashboardWorkspace({
                     </div>
 
                     {trendWindowMode === "weeks" ? (
-                      <div className="mt-3 grid gap-3 rounded-lg border border-border/70 bg-background/70 p-3 lg:grid-cols-[minmax(0,1fr)_minmax(13rem,14rem)_minmax(13rem,14rem)] lg:items-end">
+                      <div className="mt-2 grid gap-2 rounded-md border border-border/55 bg-background/70 p-2.5 lg:grid-cols-[minmax(0,1fr)_minmax(13rem,14rem)_minmax(13rem,14rem)] lg:items-end">
                         <div className="flex items-start gap-2 pr-1">
-                          <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-background">
+                          <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-border/70 bg-background">
                             <CalendarRangeIcon className="size-4" />
                           </div>
                           <div className="flex flex-col gap-0.5">
@@ -1193,7 +1204,7 @@ export function DashboardWorkspace({
                     ) : null}
 
                     {activeForecast && predictionSummary ? (
-                      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <Badge variant="outline">Dashed lines = prediction</Badge>
                         <span>{predictionSummary}</span>
                       </div>
@@ -1204,8 +1215,8 @@ export function DashboardWorkspace({
             ) : null}
           </div>
 
-          <div className="flex flex-1 flex-col overflow-y-auto px-4 py-5 lg:px-6 lg:py-6">
-            <TabsContent value="overview" className="flex flex-col gap-6">
+          <div className="flex flex-1 flex-col overflow-y-auto px-3 py-4 lg:px-5 lg:py-5">
+            <TabsContent value="overview" className="flex flex-col gap-5">
               {hasData ? (
                 <>
                   {activeForecast && predictionMode !== "off" ? (
@@ -1238,10 +1249,10 @@ export function DashboardWorkspace({
               )}
             </TabsContent>
 
-            <TabsContent value="revenue-engine" className="flex flex-col gap-6">
+            <TabsContent value="revenue-engine" className="flex flex-col gap-5">
               {hasData ? (
                 <>
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                     {revenueMetricKeys.map((key) => (
                       <MetricCard
                         key={key}
@@ -1269,7 +1280,7 @@ export function DashboardWorkspace({
 
             <TabsContent
               value="product-market-signal"
-              className="flex flex-col gap-6"
+              className="flex flex-col gap-5"
             >
               {hasData ? (
                 <>
@@ -1295,7 +1306,7 @@ export function DashboardWorkspace({
               )}
             </TabsContent>
 
-            <TabsContent value="delivery-stability" className="flex flex-col gap-6">
+            <TabsContent value="delivery-stability" className="flex flex-col gap-5">
               {hasData ? (
                 <>
                   <MetricCardGrid
@@ -1318,12 +1329,12 @@ export function DashboardWorkspace({
               )}
             </TabsContent>
 
-            <TabsContent value="weekly-update" className="flex flex-col gap-6">
+            <TabsContent value="weekly-update" className="flex flex-col gap-5">
               <WeeklyUpdateSection dashboard={dashboard} snapshots={snapshots} />
             </TabsContent>
 
             {user.role === "admin" ? (
-              <TabsContent value={ADMIN_VIEW_ID} className="flex flex-col gap-6">
+              <TabsContent value={ADMIN_VIEW_ID} className="flex flex-col gap-5">
                 <AdminPanel
                   users={users}
                   currentUser={user}
@@ -1386,7 +1397,7 @@ function MetricCardGrid({
   comparisonSnapshot: WeeklySnapshot | null;
 }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
       {metricKeys.map((key) => (
         <MetricCard
           key={key}
@@ -1421,37 +1432,37 @@ function MetricCard({
         : ArrowDownRightIcon;
 
   return (
-    <Card className="h-full min-h-[10.75rem] border-border bg-card shadow-none">
-      <CardHeader className="flex h-full flex-col gap-4 p-5">
-        <div className="flex min-h-10 items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-muted">
-              <Icon className="size-5" />
+    <Card className="h-full min-h-[8.75rem] border-border/55 bg-card shadow-none">
+      <CardHeader className="flex h-full flex-col gap-3 p-4">
+        <div className="flex min-h-9 items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/45 text-muted-foreground">
+              <Icon className="size-4" />
             </div>
             <div className="min-w-0">
               <CardDescription className="truncate text-xs">
                 {field.shortLabel}
               </CardDescription>
-              <CardTitle className="mt-1 truncate text-xl leading-none">
+              <CardTitle className="mt-1 truncate text-lg leading-none">
                 {formatMetricByKey(metricKey, latestValue)}
               </CardTitle>
             </div>
           </div>
         </div>
-        <div className="mt-auto flex flex-1 flex-col justify-end gap-2">
-          <p className="min-h-10 text-sm leading-5 text-muted-foreground">
+        <div className="mt-auto flex flex-1 flex-col justify-end gap-1.5">
+          <p className="line-clamp-2 min-h-8 text-xs leading-4 text-muted-foreground">
             {field.description}
           </p>
           <div
             className={cn(
-              "flex min-h-5 items-center gap-2 whitespace-nowrap text-sm",
+              "flex min-h-5 items-center gap-1.5 whitespace-nowrap text-xs",
               comparison.tone === "positive" &&
                 "text-emerald-600 dark:text-emerald-400",
               comparison.tone === "negative" && "text-rose-600 dark:text-rose-400",
               comparison.tone === "neutral" && "text-muted-foreground",
             )}
           >
-            {DeltaIcon ? <DeltaIcon className="size-4 shrink-0" /> : null}
+            {DeltaIcon ? <DeltaIcon className="size-3.5 shrink-0" /> : null}
             <span className="truncate">{comparison.longText}</span>
           </div>
         </div>

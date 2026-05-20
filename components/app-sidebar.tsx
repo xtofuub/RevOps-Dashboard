@@ -59,18 +59,18 @@ export function AppSidebar({
 }: AppSidebarProps) {
   return (
     <Sidebar collapsible="offcanvas" variant="sidebar" {...props}>
-      <SidebarHeader className="px-4 py-3 border-b border-border/40">
+      <SidebarHeader className="border-b border-sidebar-border/70 px-3 py-2.5">
         <div className="flex items-center gap-2.5">
-          <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/10">
-            <CommandIcon className="size-3.5 text-primary" />
+          <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-sidebar-accent text-sidebar-accent-foreground">
+            <CommandIcon className="size-3.5" />
           </div>
-          <span className="text-sm font-medium text-foreground">Fitsec</span>
+          <span className="text-sm font-medium text-sidebar-foreground">Fitsec</span>
         </div>
       </SidebarHeader>
 
       <SidebarContent className="px-2 py-2">
         <SidebarGroup className="px-0 py-0">
-          <SidebarGroupLabel className="px-2 text-xs text-muted-foreground/50 font-normal mb-1">
+          <SidebarGroupLabel className="mb-1 h-6 px-2 text-[11px] font-medium uppercase tracking-[0.12em] text-sidebar-foreground/45">
             Views
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -83,10 +83,10 @@ export function AppSidebar({
                       isActive={tab.id === activeView}
                       onClick={() => onViewChange(tab.id)}
                       tooltip={tab.label}
-                      className="gap-2.5 px-2 text-muted-foreground data-active:text-foreground data-active:bg-accent"
+                      className="h-7 gap-2 px-2 text-sidebar-foreground/62 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground"
                     >
-                      <Icon className="size-4 shrink-0" />
-                      <span className="text-sm font-normal">{tab.label}</span>
+                      <Icon className="size-3.5 shrink-0" />
+                      <span className="text-xs font-medium">{tab.label}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
@@ -99,7 +99,7 @@ export function AppSidebar({
           <>
             <SidebarSeparator className="my-2" />
             <SidebarGroup className="px-0 py-0">
-              <SidebarGroupLabel className="px-2 text-xs text-muted-foreground/50 font-normal mb-1">
+              <SidebarGroupLabel className="mb-1 h-6 px-2 text-[11px] font-medium uppercase tracking-[0.12em] text-sidebar-foreground/45">
                 Admin
               </SidebarGroupLabel>
               <SidebarGroupContent>
@@ -109,10 +109,10 @@ export function AppSidebar({
                       isActive={activeView === ADMIN_VIEW_ID}
                       onClick={() => onViewChange(ADMIN_VIEW_ID)}
                       tooltip="Admin Panel"
-                      className="gap-2.5 px-2 text-muted-foreground data-active:text-foreground data-active:bg-accent"
+                      className="h-7 gap-2 px-2 text-sidebar-foreground/62 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground"
                     >
-                      <ShieldCheckIcon className="size-4 shrink-0" />
-                      <span className="text-sm font-normal">Admin Panel</span>
+                      <ShieldCheckIcon className="size-3.5 shrink-0" />
+                      <span className="text-xs font-medium">Admin Panel</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </SidebarMenu>
@@ -125,7 +125,7 @@ export function AppSidebar({
           <>
             <SidebarSeparator className="my-2" />
             <SidebarGroup className="px-0 py-0">
-              <SidebarGroupLabel className="px-2 text-xs text-muted-foreground/50 font-normal mb-1">
+              <SidebarGroupLabel className="mb-1 h-6 px-2 text-[11px] font-medium uppercase tracking-[0.12em] text-sidebar-foreground/45">
                 Watch list
               </SidebarGroupLabel>
               <SidebarGroupContent>
@@ -133,13 +133,13 @@ export function AppSidebar({
                   {dashboard.healthAlerts.map((alert) => (
                     <div
                       key={alert.id}
-                      className="rounded-md border border-border/40 bg-muted/30 px-3 py-2"
+                      className="rounded-md px-2 py-1.5 text-sidebar-foreground/70"
                     >
-                      <div className="flex items-center gap-1.5 text-xs text-foreground">
-                        <TriangleAlertIcon className="size-3 text-amber-500 shrink-0" />
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <TriangleAlertIcon className="size-3 shrink-0 text-amber-500" />
                         <span>{alert.title}</span>
                       </div>
-                      <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{alert.description}</p>
+                      <p className="mt-1 text-xs leading-relaxed text-sidebar-foreground/45">{alert.description}</p>
                     </div>
                   ))}
                 </div>
@@ -149,20 +149,20 @@ export function AppSidebar({
         ) : null}
       </SidebarContent>
 
-      <SidebarFooter className="px-3 py-3 border-t border-border/40">
-        <div className="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-accent transition-colors">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-foreground text-xs font-medium">
+      <SidebarFooter className="border-t border-sidebar-border/70 px-2 py-2.5">
+        <div className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-sidebar-accent">
+          <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-xs font-medium text-sidebar-accent-foreground">
             {user.username[0].toUpperCase()}
           </div>
           <div className="flex min-w-0 flex-col">
-            <span className="truncate text-xs font-medium text-foreground">{user.username}</span>
-            <span className="truncate text-xs text-muted-foreground capitalize">{user.role}</span>
+            <span className="truncate text-xs font-medium text-sidebar-foreground">{user.username}</span>
+            <span className="truncate text-[11px] capitalize text-sidebar-foreground/45">{user.role}</span>
           </div>
           <form action={logout} className="ml-auto shrink-0">
             <button
               type="submit"
               title="Sign out"
-              className="flex size-6 items-center justify-center rounded text-muted-foreground hover:text-foreground transition-colors"
+              className="flex size-6 items-center justify-center rounded text-sidebar-foreground/45 transition-colors hover:text-sidebar-foreground"
             >
               <LogOutIcon className="size-3.5" />
             </button>

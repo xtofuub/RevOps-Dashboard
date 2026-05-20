@@ -41,7 +41,7 @@ npm run dev
 
 Ensimmaisella kaynnistyksella luodaan paikalliset testitunnukset:
 
-- Admin: `admin` / `admin123`
+- Admin: `admin` / `admin123` vaihtakaa salasanat admin panelista
 - User: `user` / `user123`
 
 ## Hyodylliset komennot

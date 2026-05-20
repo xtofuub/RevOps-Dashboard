@@ -43,16 +43,16 @@ export function SiteHeader({
   const isAdminView = activeView === ADMIN_VIEW_ID;
 
   return (
-    <header className="flex h-(--header-height) shrink-0 items-center border-b border-border/60 bg-background/80 backdrop-blur-sm">
-      <div className="flex w-full items-center gap-3 px-4 lg:px-6">
-        <SidebarTrigger className="-ml-1 size-8 hover:bg-muted/50" />
+    <header className="flex h-(--header-height) shrink-0 items-center border-b border-border/55 bg-background/90">
+      <div className="flex w-full items-center gap-2.5 px-3 lg:px-5">
+        <SidebarTrigger className="-ml-1 size-7 hover:bg-muted/50" />
         <Separator
           orientation="vertical"
-          className="mx-1 h-5 bg-border/60"
+          className="mx-0.5 h-4 bg-border/60"
         />
 
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <div className="truncate text-sm font-semibold tracking-tight">
+          <div className="truncate text-sm font-medium tracking-tight">
             {activeViewMeta.label}
           </div>
           <div className="hidden truncate text-xs text-muted-foreground/70 md:block">
@@ -61,11 +61,11 @@ export function SiteHeader({
         </div>
 
         <div className="hidden items-center gap-2 md:flex">
-          <Badge variant="outline" className="text-[11px] font-medium px-2.5 py-0.5 h-5">
+          <Badge variant="outline" className="h-5 px-2 text-[11px] font-medium">
             {totalWeeks} snapshots
           </Badge>
           {lastUpdatedLabel ? (
-            <Badge variant="outline" className="text-[11px] font-medium px-2.5 py-0.5 h-5">
+            <Badge variant="outline" className="h-5 px-2 text-[11px] font-medium">
               Updated {lastUpdatedLabel}
             </Badge>
           ) : null}
@@ -75,7 +75,7 @@ export function SiteHeader({
         <ThemeToggle />
 
         <Dialog>
-          <DialogTrigger render={<Button variant="outline" size="sm" className="h-8 text-xs" />}>
+          <DialogTrigger render={<Button variant="outline" size="sm" className="text-xs" />}>
             <InfoIcon data-icon="inline-start" className="size-3.5" />
             Metrics
           </DialogTrigger>
@@ -107,7 +107,7 @@ export function SiteHeader({
           </DialogContent>
         </Dialog>
 
-        <Button size="sm" onClick={() => onViewChange("weekly-update")} className="h-8 text-xs gap-1.5">
+        <Button size="sm" onClick={() => onViewChange("weekly-update")} className="gap-1.5 text-xs">
           <FileTextIcon data-icon="inline-start" className="size-3.5" />
           <span className="hidden sm:inline">Weekly update</span>
         </Button>

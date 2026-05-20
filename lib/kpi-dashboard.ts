@@ -146,9 +146,9 @@ export type MetricFieldDefinition = {
 const revenueEngineFields: readonly MetricFieldDefinition[] = [
   {
     key: "newCustomersPerMonth",
-    label: "New customers / month",
+    label: "New customers",
     shortLabel: "New customers",
-    description: "Number of new customers won this month so far.",
+    description: "New customers won this week.",
     format: "count",
     min: 0,
     max: 100000,

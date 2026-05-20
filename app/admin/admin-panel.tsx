@@ -63,6 +63,14 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
   Table,
   TableBody,
   TableCell,
@@ -950,33 +958,49 @@ function RevisionDetailsDialog({
 }: {
   revision: AdminRevisionDebugRecord;
 }) {
+  const [open, setOpen] = React.useState(false);
+  const contentRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      contentRef.current?.scrollTo({ top: 0 });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, revision.id]);
+
   return (
-    <Dialog>
-      <DialogTrigger render={
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger render={
         <Button type="button" variant="outline" size="sm">
           Details
         </Button>
       } />
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>
+      <SheetContent className="w-[min(36rem,100vw)] overflow-hidden sm:max-w-xl">
+        <SheetHeader className="shrink-0 pr-12">
+          <SheetTitle>
             {revision.weekOf} v{revision.revisionNumber}
-          </DialogTitle>
-          <DialogDescription>
+          </SheetTitle>
+          <SheetDescription>
             Saved by {revision.authorLabel} on {formatDate(revision.createdAt)}.
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
-        <div className="grid gap-4">
+        <div
+          ref={contentRef}
+          className="grid min-h-0 flex-1 gap-3 overflow-y-auto px-4 pb-4"
+        >
           {revision.payloadSections.map((section) => (
             <section
               key={`${revision.id}-${section.title}`}
-              className="rounded-lg border bg-background/55"
+              className="rounded-lg border border-border/55 bg-background/55"
             >
-              <div className="border-b px-4 py-3">
+              <div className="border-b border-border/55 px-3 py-2.5">
                 <h3 className="text-sm font-medium">{section.title}</h3>
               </div>
-              <dl className="grid gap-x-5 gap-y-3 p-4 sm:grid-cols-2">
+              <dl className="grid gap-x-5 gap-y-3 p-3 sm:grid-cols-2">
                 {section.items.map((item) => (
                   <div key={`${section.title}-${item.label}`} className="min-w-0">
                     <dt className="text-xs text-muted-foreground">
@@ -991,7 +1015,7 @@ function RevisionDetailsDialog({
             </section>
           ))}
 
-          <details className="rounded-lg border bg-background/55 px-4 py-3">
+          <details className="rounded-lg border border-border/55 bg-background/55 px-3 py-2.5">
             <summary className="cursor-pointer text-sm font-medium">
               Raw JSON
             </summary>
@@ -1000,8 +1024,8 @@ function RevisionDetailsDialog({
             </pre>
           </details>
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
 

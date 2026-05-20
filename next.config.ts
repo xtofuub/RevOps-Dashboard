@@ -18,7 +18,6 @@ function getAllowedDevOrigins() {
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: getAllowedDevOrigins(),
-  reactCompiler: true,
   turbopack: {
     root: workspaceRoot,
   },

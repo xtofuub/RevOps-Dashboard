@@ -453,8 +453,8 @@ export function WeeklyUpdateForm({
   }
 
   return (
-    <Card className="border-border/60 bg-card/90 shadow-sm">
-      <CardHeader className="gap-5">
+    <Card className="border-border/55 bg-card shadow-none">
+      <CardHeader className="gap-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex flex-col gap-1">
             <CardTitle>Weekly update</CardTitle>
@@ -463,12 +463,12 @@ export function WeeklyUpdateForm({
               again, your earlier values are kept in revision history.
             </CardDescription>
           </div>
-          <Badge variant="outline" className="h-8 gap-1.5 px-3">
+          <Badge variant="outline" className="h-6 gap-1.5 px-2">
             <CalendarDaysIcon data-icon="inline-start" />
             One save per week
           </Badge>
         </div>
-        <Alert className="items-start gap-3">
+        <Alert className="items-start gap-3 border-border/55 bg-background/45">
           <DatabaseIcon />
           <AlertTitle>
             {currentStoredSnapshot
@@ -488,9 +488,9 @@ export function WeeklyUpdateForm({
         </Alert>
       </CardHeader>
       <form onSubmit={handleSubmit}>
-        <CardContent className="flex flex-col gap-6">
+        <CardContent className="flex flex-col gap-5">
           <FieldGroup>
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)_auto]">
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)_auto]">
               <Field data-invalid={Boolean(fieldErrors.weekOf)}>
                 <FieldLabel htmlFor="weekOf">Week ending date</FieldLabel>
                 <FieldContent>
@@ -566,16 +566,18 @@ export function WeeklyUpdateForm({
           </FieldGroup>
 
           {KPI_FORM_SECTIONS.map((section) => (
-            <Card
+            <section
               key={section.id}
-              className="border-border/60 bg-background/70 shadow-none"
+              className="rounded-lg border border-border/55 bg-background/35"
             >
-              <CardHeader className="gap-1.5">
-                <CardTitle className="text-base">{section.title}</CardTitle>
-                <CardDescription>{section.description}</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-6">
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="border-b border-border/50 px-4 py-3">
+                <h3 className="text-sm font-medium">{section.title}</h3>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  {section.description}
+                </p>
+              </div>
+              <div className="flex flex-col gap-5 p-4">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {section.fields.map((field) => {
                     const isAutoCalc =
                       field.key === "pipelineVelocity" ||
@@ -629,11 +631,11 @@ export function WeeklyUpdateForm({
                     <FieldSeparator>Stage flow</FieldSeparator>
                     <FieldSet>
                       <FieldLegend>Stage conversion and time in stage</FieldLegend>
-                      <div className="grid gap-4 lg:grid-cols-2">
+                      <div className="grid gap-3 lg:grid-cols-2">
                         {formState.stageMetrics.map((metric, index) => (
                           <div
                             key={metric.stage}
-                            className="grid gap-4 rounded-xl border border-border/60 bg-card p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
+                            className="grid gap-3 rounded-lg border border-border/55 bg-card/70 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
                           >
                             <div className="flex flex-col gap-1">
                               <div className="text-sm font-medium">
@@ -651,7 +653,7 @@ export function WeeklyUpdateForm({
                                   : "No history yet"}
                               </div>
                             </div>
-                            <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="grid gap-3 sm:grid-cols-2">
                               <Field
                                 data-invalid={Boolean(
                                   fieldErrors[`stageMetrics.${index}.conversionPct`],
@@ -730,7 +732,7 @@ export function WeeklyUpdateForm({
                     <FieldSeparator>Voice of customer</FieldSeparator>
                     <FieldSet>
                       <FieldLegend>Why deals are lost (top 3)</FieldLegend>
-                      <div className="grid gap-4 md:grid-cols-3">
+                      <div className="grid gap-3 md:grid-cols-3">
                         {formState.lossReasonsTop3.map((reason, index) => (
                           <Field
                             key={`loss-reason-${index}`}
@@ -794,12 +796,12 @@ export function WeeklyUpdateForm({
                     </FieldSet>
                   </>
                 ) : null}
-              </CardContent>
-            </Card>
+              </div>
+            </section>
           ))}
         </CardContent>
 
-        <CardFooter className="flex flex-wrap items-center justify-end gap-3 border-t border-border/60 bg-muted/20">
+        <CardFooter className="flex flex-wrap items-center justify-end gap-3 border-t border-border/55 bg-muted/15">
           <div className="mr-auto text-sm text-muted-foreground">
             Values are checked when you save. Earlier saves are kept in history.
           </div>
